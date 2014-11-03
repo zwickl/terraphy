@@ -8,18 +8,29 @@ from argparse import ArgumentParser
 from itertools import izip
 from collections import Iterable
 
-from pygot.utils import flattened_array_generator
+sys.path.append("../")
+from terraphy.triplets import flattened_array_generator
 
-from dendropy import TreeList, Tree, Node, DataSet, TaxonSet, treesplit
-from dendropy.treecalc import symmetric_difference
-from pygraph.classes.graph import graph
-from pygraph.algorithms.accessibility import connected_components
-
-#for dendropy 4 compatability
+#DENDROPY PACKAGE
 try:
-    from dendropy.error import DataError
-except:
-    from dendropy.utility.error import DataError
+    from dendropy import TreeList, Tree, Node, DataSet, TaxonSet, treesplit
+    from dendropy.treecalc import symmetric_difference
+    
+    #for dendropy 4 compatability
+    try:
+        from dendropy.error import DataError
+    except:
+        from dendropy.utility.error import DataError
+except ImportError:
+    sys.exit('problem importing dendropy package - it is required')
+
+
+#PYGRAPH PACKAGE
+try:
+    from pygraph.classes.graph import graph
+    from pygraph.algorithms.accessibility import connected_components
+except ImportError:
+    sys.exit('problem importing pygraph package - it is required')
 
 
 def build(label_set, triplets, node):
@@ -417,11 +428,10 @@ if options.build:
     build(labels, triplets, build_tree.seed_node)
     output_result('%s\n' % build_tree)
     
-    out_treefilename = 'build.tre'
-    with open(out_treefilename, 'w') as outtree:
-        outtree.write('%s\n' % build_tree)
-    
     #could automatically open in a viewer here
+    #out_treefilename = 'build.tre'
+    #with open(out_treefilename, 'w') as outtree:
+    #    outtree.write('%s\n' % build_tree)
     #viewer_command =  shlex.split('java -jar "/Applications/FigTree1.3.1/FigTree v1.3.1.app/Contents/Resources/Java/figtree.jar"')
     #viewer_command.append(out_treefilename)
     #subprocess.call(viewer_command)

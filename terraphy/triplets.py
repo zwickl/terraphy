@@ -2,22 +2,27 @@
 import sys
 import re
 from argparse import ArgumentParser
+from collections import Iterable
 
-from pygot.utils import flattened_array_generator
 
-import dendropy
+def flattened_array_generator(array, level=1, reverse=False):
+    '''Generator to be used in flatten_array function, or by itself.
+    Difference is that this doesn't create the flattended list, as
+    flatten_array does, it just yields elements as if it had.
+    Favor this in iteration, obviously.
+    '''
+    if isinstance(array, Iterable) and not isinstance(array, str):
+        if reverse:
+            array = array[::-1]
 
-#for dendropy 4 compatability
-try:
-    from dendropy.error import DataError
-except ImportError:
-    from dendropy.utility.error import DataError
-
-parser = ArgumentParser(description='Read newick or nexus input trees from file or stdin and output arbitrary taxon triples defining each edge')
-
-parser.add_argument('treefiles', nargs='*', default=[], help='nexus or newick treefile(s) to read (omit for stdin)')
-
-options = parser.parse_args()
+        for toplvl in array:
+            if level == 0:
+                yield toplvl
+            else:
+                for sub in flattened_array_generator(toplvl, level=level - 1, reverse=reverse):
+                    yield sub
+    else:
+        yield array
 
 
 def find_triplets_defining_edges_descending_from_node(components):

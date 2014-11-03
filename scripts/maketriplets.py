@@ -7,7 +7,10 @@ sys.path.append("../")
 
 from terraphy.triplets import find_triplets_defining_edges_descending_from_node
 
-import dendropy
+try:
+    import dendropy
+except ImportError:
+    sys.exit('problem importing dendropy package - it is required')
 
 #for dendropy 4 compatability
 try:
