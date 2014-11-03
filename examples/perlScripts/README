@@ -1,0 +1,41 @@
+Documentation for PERL scripts needed to explore phylogenetic terraces 
+(see paper by Sanderson, McMahon, and Steel, in prep.)
+
+General format issues:
+	Tree files are always in newick format, one per row, each ending in semicolon.
+	Subset files have one row per subset. Each row is a tab delimited set of taxon names.
+	Triplet file is a subset file having its first row with all taxon names (tab delim), and
+		subsequent rows each having exactly three names, the last taxon name
+		corresponding to the outgroup of the triplet.
+
+General setup is that we begin with a supermatrix, D, from k loci and n taxa,
+and a tree, T, on n taxa, constructed from this matrix. Generally, at the ith
+locus, only a subset of the n taxa are present. We build a subsets file, which
+describes these k subsets. We build the k subtrees of T, corresponding to these
+subsets, and from there, we can enumerate all parent trees (countParents.pl),
+or if k=2, we can run the MDLS algorithm via mdls.pl (see paper) to find the largest set of 
+taxa that defines a tree. After some MP or ML search, we may have numerous trees, so then
+'sameTerrace.pl' can be used to see how many of these belong to distinct terraces.
+
+Scripts:
+
+parseNexusCharSetToDAV.pl -- Read a nexus file for a supermatrix that has charsets included, and create a subsets file.
+	Each row of the subset file has the taxa present for that locus in the data matrix.
+displaysub.pl -- Read a tree and a subsets file, and write the subtrees induced by these.
+maketriplets.pl -- Read a tree file, and write a triplets file for this tree.
+countParents.pl -- Read a triplets file, and enumerate the rooted parent trees for this collection of triplets.
+build.pl -- Read a triplets file, and write the BUILD algorithm tree (= Adam's consensus tree; see paper).
+mdls.pl -- Read two trees and run the MDLS algorithm to find the largest subtree defined by these trees, minus some of
+	their taxa.
+sameTerrace.pl -- Read a set of trees, and a subset file, and enumerate how many different terraces are present.
+treesequal.pm -- PERL Module needed by 'sameTerrace.pl'
+
+
+Utility scripts:
+
+treesequal.pl -- implementation of efficient checking to see if two trees are the same
+isBinary.pl -- check if a tree is binary
+mrp.pl -- create an MRP (matrix representation with parsimony) matrix in nexus format, from an input of trees
+
+See each individual script for further documentation.
+
