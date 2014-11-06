@@ -155,7 +155,7 @@ def my_connected_components(connections):
     #{'A': 1, 'C': 1, 'B': 1, 'E': 2, 'D': 1, 'G': 2, 'F': 2, 'H': 2}
     #need to convert that into actual node sets for each componenet
     #it really doesn't seem like this should be necessary
-    comp = {num:[] for num in range(1, max(connect_dict.values()) + 1)}
+    comp = {num:[] for num in xrange(1, max(connect_dict.values()) + 1)}
     for node, compnum in connect_dict.iteritems():
         comp[compnum].append(node)
 
@@ -368,6 +368,7 @@ parser.add_argument('-d', '--display', action='store_true', default=False, help=
 
 parser.add_argument('-l', '--list-terraces', action='store_true', default=False, help='take a set of trees and assign them to terraces (requires --subset-file and --tree-files)')
 
+
 #if no arguments are passed, try to start the tkinter gui
 tk_root = None
 if len(sys.argv) == 1:
@@ -376,27 +377,33 @@ if len(sys.argv) == 1:
         from pygot.tkinterutils import *
         from ttk import *
     except ImportError:
-        sys.stderr.write('\nUnable to import GUI componenets.  Use command line options.\n\n'.upper())
         sys.stderr.write('%s\n' % parser.format_help())
+        sys.stderr.write('\nUnable to import GUI componenets.  Use command line options.\n\n'.upper())
         sys.exit()
 
     tk_root = Tk()
-    tk_gui = ArgparseGui(parser, tk_root, width=1024, height=768)
+    tk_gui = ArgparseGui(parser, tk_root, width=1152, height=720, output_frame=True, destroy_when_done=False)
 
-    #Need to do this on OS X, otherwise root.lift() should work
-    os.system('''/usr/bin/osascript -e 'tell app "Finder" to set frontmost of process "Python" to true' ''')
-    #root.lift()
-    
+    #Need to do this on OS X to bring window to front, otherwise root.lift() should work
+    if 'darwin' in sys.platform.lower():
+        try:
+            #this can give odd non-critical error messages from the OS, so send stderr to devnull
+            retcode = subprocess.call(shlex.split('''/usr/bin/osascript -e 'tell app "Finder" to set frontmost of process "Python" to true' '''), stderr=open(os.devnull, 'wb'))
+        except:
+            #didn't manage to get window to front, but don't worry about it
+            pass
+    else:
+        tk_root.lift()
+   
     tk_root.mainloop()
-    if gui.cancelled:
+    if tk_gui.cancelled:
         sys.exit('cancelled ...')
-    args = tk_gui.make_commandline_list()
-    options = parser.parse_args(args)
-
-    output_result = gui.output_result
+    options = parser.parse_args(tk_gui.make_commandline_list())
+    output_result = tk_gui.output_result
 else:
     options = parser.parse_args()
     output_result = sys.stdout.write
+
 
 labels = []
 triplets = []
@@ -436,8 +443,8 @@ if options.build:
     #viewer_command.append(out_treefilename)
     #subprocess.call(viewer_command)
     
-    #if tk_root:
-    #    tk_root.mainloop()
+    if tk_root:
+        tk_root.mainloop()
 
 if options.parents:
     if not options.triplet_file:
