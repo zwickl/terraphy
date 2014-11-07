@@ -50,7 +50,10 @@ sys.stderr.write('read %d trees\n' % len(intrees))
 
 triplets = []
 for tree in intrees:
-    treestr = tree.as_newick_string()
+    if hasattr(tree, 'as_newick_string'):
+        treestr = tree.as_newick_string()
+    else:
+        treestr = tree._as_newick_string()
     treestr = re.sub('([A-Za-z_.-]+)', '"\\1"', treestr)
     triplets.extend(find_triplets_defining_edges_descending_from_node(eval(treestr)))
 
