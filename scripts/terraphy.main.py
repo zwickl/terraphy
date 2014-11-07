@@ -225,21 +225,32 @@ def dendropy_read_treefile(filenames):
     return intrees
 
 
-def displayed_subtree(tree, labels):
+def displayed_subtree(tree, labels, use_retain=False):
     #this is annoying, but Dendropy can consider the labels not matching depending on 
     #underscore vs. space issues
     labels = [ re.sub('_', ' ', label) for label in labels ]
     taxa = TaxonSet(tree.taxon_set)
     newtree = Tree(tree, taxon_set=taxa)
-    newtree.retain_taxa_with_labels(labels)
+    if use_retain:
+        newtree.retain_taxa_with_labels(labels)
+    else:
+        newtree.prune_taxa_with_labels(labels)
     treesplit.encode_splits(newtree)
     return newtree
 
 
 def print_displayed_subtrees(trees, subsets):
+    sub_sets = [ set(subs) for subs in subsets ]
+    all_taxa = set()
+    for subs in sub_sets:
+        all_taxa |= subs
+    to_prune = [ list(all_taxa - subs) for subs in sub_sets ]
     for tree in trees:
-        for subset in subsets:
-            newtree = displayed_subtree(tree, subset)
+        for prune, retain in zip(to_prune, subsets):
+            if len(prune) < len(retain):
+                newtree = displayed_subtree(tree, prune)
+            else:
+                newtree = displayed_subtree(tree, retain, use_retain=True)
             if hasattr(newtree, 'as_newick_string'):
                 newtreestr = newtree.as_newick_string()
             else:
