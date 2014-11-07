@@ -8,12 +8,14 @@ from argparse import ArgumentParser
 from itertools import izip
 from collections import Iterable
 
+import cProfile, pstats, StringIO
+
 sys.path.append("../")
 from terraphy.triplets import flattened_array_generator
 
 #DENDROPY PACKAGE
 try:
-    from dendropy import TreeList, Tree, Node, DataSet, TaxonSet, treesplit
+    from dendropy import TreeList, Tree, Node, DataSet, TaxonSet
     from dendropy.treecalc import symmetric_difference
     
     #for dendropy 4 compatability
@@ -21,6 +23,13 @@ try:
         from dendropy.error import DataError
     except:
         from dendropy.utility.error import DataError
+
+    #this deals with changes in DendroPy 4
+    try:
+        from dendropy.calculate import treesplit
+    except ImportError:
+        from dendropy import treesplit
+
 except ImportError:
     sys.exit('problem importing dendropy package - it is required')
 
@@ -223,7 +232,7 @@ def displayed_subtree(tree, labels):
     taxa = TaxonSet(tree.taxon_set)
     newtree = Tree(tree, taxon_set=taxa)
     newtree.retain_taxa_with_labels(labels)
-    newtree.update_splits()
+    treesplit.encode_splits(newtree)
     return newtree
 
 
@@ -231,7 +240,11 @@ def print_displayed_subtrees(trees, subsets):
     for tree in trees:
         for subset in subsets:
             newtree = displayed_subtree(tree, subset)
-            print newtree.as_newick_string() + ';'
+            if hasattr(newtree, 'as_newick_string'):
+                newtreestr = newtree.as_newick_string()
+            else:
+                newtreestr = newtree._as_newick_string()
+            print newtreestr + ';'
 
 
 def same_tree(reference_tree, test_tree):
@@ -249,7 +262,10 @@ def same_tree(reference_tree, test_tree):
         treesplit.encode_splits(test_tree)
    
     #seems like this set comparison should be faster, but not really
-    if set(reference_tree.split_edges.keys()) != set(test_tree.split_edges.keys()):
+    if isinstance(reference_tree.split_edges, dict):
+        if set(reference_tree.split_edges.keys()) != set(test_tree.split_edges.keys()):
+            return False
+    elif set(reference_tree.split_edges) != set(test_tree.split_edges):
         return False
     '''
     for split in reference_tree.split_edges:
@@ -306,7 +322,7 @@ def assign_to_terraces_using_hashes(trees, subsets):
     #the first tree has to be its own terrace
     #this_tree_subtrees = TreeList( [displayed_subtree(trees[0], subset) for subset in subsets] )
     for tree in trees:
-        tree.update_splits()
+        treesplit.encode_splits(tree)
 
     this_tree_subtrees = [ sum([ hash(n.edge.split_bitmask) for n in displayed_subtree(trees[0], subset).internal_nodes() ]) for subset in subsets]
     terrace_subtree_list = [this_tree_subtrees]
@@ -368,6 +384,7 @@ parser.add_argument('-d', '--display', action='store_true', default=False, help=
 
 parser.add_argument('-l', '--list-terraces', action='store_true', default=False, help='take a set of trees and assign them to terraces (requires --subset-file and --tree-files)')
 
+parser.add_argument('--profile', action='store_true', default=False, help='profile the given functionality')
 
 #if no arguments are passed, try to start the tkinter gui
 tk_root = None
@@ -409,6 +426,8 @@ labels = []
 triplets = []
 subsets = []
 trees = None
+
+prof = cProfile.Profile() if options.profile else None
 
 if options.triplet_file:
     with open(options.triplet_file) as intrips:
@@ -459,11 +478,22 @@ if options.coverage:
 if options.display:
     if not options.subset_file and options.tree_files:
         sys.exit('must specify both subset file (-s) and tree file (--tree-files) to print displayed subtrees')
+    if prof:
+        prof.enable()
     print_displayed_subtrees(trees, subsets)
+    if prof:
+        prof.disable()
 
 if options.list_terraces:
     if not options.subset_file and options.tree_files:
         sys.exit('must specify both subset file (-s) and tree file (--tree-files) to assign trees to terraces')
     assign_to_terraces(trees, subsets)
+
+if prof:
+    s = StringIO.StringIO()
+    sortby = 'cumulative'
+    ps = pstats.Stats(prof, stream=s).sort_stats(sortby)
+    ps.print_stats()
+    sys.stderr.write('%s\n' %s.getvalue())
 
 
