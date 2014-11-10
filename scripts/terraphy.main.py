@@ -229,8 +229,9 @@ def displayed_subtree(tree, labels, use_retain=False):
     #this is annoying, but Dendropy can consider the labels not matching depending on 
     #underscore vs. space issues
     labels = [ re.sub('_', ' ', label) for label in labels ]
-    taxa = TaxonSet(tree.taxon_set)
-    newtree = Tree(tree, taxon_set=taxa)
+    #taxa = TaxonSet(tree.taxon_set)
+    #newtree = Tree(tree, taxon_set=taxa)
+    newtree = Tree(tree, taxon_set=tree.taxon_set)
     if use_retain:
         newtree.retain_taxa_with_labels(labels)
     else:
@@ -505,6 +506,7 @@ if prof:
     sortby = 'cumulative'
     ps = pstats.Stats(prof, stream=s).sort_stats(sortby)
     ps.print_stats()
+    ps.print_callers()
     sys.stderr.write('%s\n' %s.getvalue())
 
 
