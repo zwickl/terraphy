@@ -42,6 +42,15 @@ except ImportError:
     sys.exit('problem importing pygraph package - it is required')
 
 
+def profile_wrapper(func, profiler, *args, **kwargs):
+    if profiler:
+        profiler.enable()
+    result = func(*args, **kwargs)
+    if profiler:
+        profiler.disable()
+    return result
+
+
 def build(label_set, triplets, node):
     if not triplets:
         for label in label_set:
@@ -213,13 +222,15 @@ def dendropy_read_treefile(filenames):
     for tf in filenames:
         #try two input formats
         try:
-            intrees.extend(TreeList.get_from_path(tf, "nexus"))
-        except DataError:
+            sys.stderr.write('Reading file %s in newick format ...\n' % tf)
             intrees.extend(TreeList.get_from_path(tf, "newick"))
+        except DataError:
+            sys.stderr.write('Reading file %s in nexus format ...\n' % tf)
+            intrees.extend(TreeList.get_from_path(tf, "nexus"))
         except ValueError:
-            sys.exit('ValueError reading from file %s, ' % tf)
+            sys.exit('ValueError reading from file %s\n' % tf)
         except AttributeError:
-            sys.exit('AttributeError reading from file %s, ' % tf)
+            sys.exit('AttributeError reading from file %s\n' % tf)
 
     sys.stderr.write('read %d trees\n' % len(intrees))
     return intrees
@@ -246,11 +257,14 @@ def print_displayed_subtrees(trees, subsets):
     for subs in sub_sets:
         all_taxa |= subs
     to_prune = [ list(all_taxa - subs) for subs in sub_sets ]
-    for tree in trees:
-        for prune, retain in zip(to_prune, subsets):
+    for tnum, tree in enumerate(trees):
+        tree.is_label_lookup_case_sensitive = True
+        for setnum, (prune, retain) in enumerate(zip(to_prune, subsets)):
             if len(prune) < len(retain):
+                sys.stderr.write('pruning tree %d to taxon set %d\n' % (tnum, setnum))
                 newtree = displayed_subtree(tree, prune)
             else:
+                sys.stderr.write('pruning tree %d to taxon set %d (using retain)\n' % (tnum, setnum))
                 newtree = displayed_subtree(tree, retain, use_retain=True)
             if hasattr(newtree, 'as_newick_string'):
                 newtreestr = newtree.as_newick_string()
@@ -366,9 +380,9 @@ def num_trees(taxa):
     elif taxa <= 2:
         trees = 1
     else:
-      trees=1;
-      for i in xrange(3, taxa + 1):
-          trees *= ((2 * i) -3)
+        trees = 1
+        for i in xrange(3, taxa + 1):
+            trees *= ((2 * i) -3)
     return trees
 
 
@@ -463,7 +477,8 @@ if options.build:
         sys.exit('triplet file (-t) must be supplied to make BUILD tree')
     
     build_tree = Tree()
-    build(labels, triplets, build_tree.seed_node)
+    profile_wrapper(build, prof, labels, triplets, build_tree.seed_node)
+    #build(labels, triplets, build_tree.seed_node)
     output_result('%s\n' % build_tree)
     
     #could automatically open in a viewer here
@@ -480,26 +495,22 @@ if options.build:
 if options.parents:
     if not options.triplet_file:
         sys.exit('triplet file (-t) must be supplied to count parent tree')
-    print superb(labels, triplets, 0)
+    print profile_wrapper(superb, prof, labels, triplets, 0)
 
 if options.coverage:
     if not options.alignment_file:
         sys.exit('alignment file (-a) must be supplied to determine taxon coverage')
-    print_subsets(options.alignment_file)
+    profile_wrapper(print_subsets, prof, options.alignment_file)
 
 if options.display:
     if not options.subset_file and options.tree_files:
         sys.exit('must specify both subset file (-s) and tree file (--tree-files) to print displayed subtrees')
-    if prof:
-        prof.enable()
-    print_displayed_subtrees(trees, subsets)
-    if prof:
-        prof.disable()
+    profile_wrapper(print_displayed_subtrees, prof, trees, subsets)
 
 if options.list_terraces:
     if not options.subset_file and options.tree_files:
         sys.exit('must specify both subset file (-s) and tree file (--tree-files) to assign trees to terraces')
-    assign_to_terraces(trees, subsets)
+    profile_wrapper(assign_to_terraces, prof, trees, subsets)
 
 if prof:
     s = StringIO.StringIO()
