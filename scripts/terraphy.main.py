@@ -130,8 +130,8 @@ def create_bipartition(components, nth):
     #leading zeros are trimmed, so add them if necessary to make the string the right length
     if len(pattern) < num_components:
         pattern = '0' * (num_components - len(pattern)) + bin(nth)[2:]
-    subsets = ([ e for e in flattened_array_generator([components[el] for el in xrange(num_components) if pattern[el] == "0"])], 
-            [e for e in flattened_array_generator([components[el] for el in xrange(num_components) if pattern[el] == "1"])])
+    subsets = (set( e for e in flattened_array_generator([components[el] for el in xrange(num_components) if pattern[el] == "0"])),
+            set(e for e in flattened_array_generator([components[el] for el in xrange(num_components) if pattern[el] == "1"])))
     return subsets
 
 
