@@ -130,10 +130,8 @@ def create_bipartition(components, nth):
     #leading zeros are trimmed, so add them if necessary to make the string the right length
     if len(pattern) < num_components:
         pattern = '0' * (num_components - len(pattern)) + bin(nth)[2:]
-    #print pattern 
     subsets = ([ e for e in flattened_array_generator([components[el] for el in xrange(num_components) if pattern[el] == "0"])], 
             [e for e in flattened_array_generator([components[el] for el in xrange(num_components) if pattern[el] == "1"])])
-    #print subsets
     return subsets
 
 
@@ -150,8 +148,11 @@ def compute(label_set, triplets):
     The triplet outgroups are ignored.
     '''
     connections = {lab:set() for lab in label_set}
-    for in1, in2, out in triplets:
-        connections[in1].add(in2)
+    try:
+        for num, (in1, in2, out) in enumerate(triplets):
+            connections[in1].add(in2)
+    except ValueError:
+        sys.exit('Could not unpack: %r' % triplets[0])
 
     return my_connected_components(connections)
 
@@ -223,10 +224,12 @@ def dendropy_read_treefile(filenames):
         #try two input formats
         try:
             sys.stderr.write('Reading file %s in newick format ...\n' % tf)
-            intrees.extend(TreeList.get_from_path(tf, "newick"))
+            #intrees.extend(TreeList.get_from_path(tf, "newick"))
+            intrees.extend(TreeList.get_from_path(tf, "newick", preserve_underscores=True))
         except DataError:
             sys.stderr.write('Reading file %s in nexus format ...\n' % tf)
-            intrees.extend(TreeList.get_from_path(tf, "nexus"))
+            #intrees.extend(TreeList.get_from_path(tf, "nexus"))
+            intrees.extend(TreeList.get_from_path(tf, "nexus", preserve_underscores=True))
         except ValueError:
             sys.exit('ValueError reading from file %s\n' % tf)
         except AttributeError:
@@ -239,15 +242,29 @@ def dendropy_read_treefile(filenames):
 def displayed_subtree(tree, labels, use_retain=False):
     #this is annoying, but Dendropy can consider the labels not matching depending on 
     #underscore vs. space issues
-    labels = [ re.sub('_', ' ', label) for label in labels ]
     #taxa = TaxonSet(tree.taxon_set)
     #newtree = Tree(tree, taxon_set=taxa)
-    newtree = Tree(tree, taxon_set=tree.taxon_set)
-    if use_retain:
-        newtree.retain_taxa_with_labels(labels)
+    #DP3 vs. DP4 
+    if hasattr(tree, 'taxon_namespace'):
+        newtree = Tree(tree, taxon_namespace=tree.taxon_namespace)
     else:
-        newtree.prune_taxa_with_labels(labels)
-    treesplit.encode_splits(newtree)
+        newtree = Tree(tree, taxon_set=tree.taxon_set)
+
+    if isinstance(labels[0], str):
+        if use_retain:
+            newtree.retain_taxa_with_labels(labels)
+        else:
+            newtree.prune_taxa_with_labels(labels)
+    else:
+        if use_retain:
+            newtree.retain_taxa(labels)
+        else:
+            newtree.prune_taxa(labels)
+
+    if hasattr(tree, 'encode_bipartitions'):
+        tree.encode_bipartitions()
+    else:
+        treesplit.encode_splits(newtree)
     return newtree
 
 
@@ -257,20 +274,32 @@ def print_displayed_subtrees(trees, subsets):
     for subs in sub_sets:
         all_taxa |= subs
     to_prune = [ list(all_taxa - subs) for subs in sub_sets ]
+
+    #labels = [ re.sub('_', ' ', label) for label in labels ]
     for tnum, tree in enumerate(trees):
         tree.is_label_lookup_case_sensitive = True
+        #print type(tree.taxon_namespace[0].label)
+        #taxon_label_map = { re.sub(' ', '_', taxon.label):taxon for taxon in tree.taxon_namespace }
+        taxon_label_map = { taxon.label:taxon for taxon in tree.taxon_namespace }
+        #print tree
+        #print subsets
+        #print to_prune
         for setnum, (prune, retain) in enumerate(zip(to_prune, subsets)):
             if len(prune) < len(retain):
                 sys.stderr.write('pruning tree %d to taxon set %d\n' % (tnum, setnum))
-                newtree = displayed_subtree(tree, prune)
+                newtree = displayed_subtree(tree, [ taxon_label_map[t] for t in prune ])
+                #newtree = displayed_subtree(tree, [ re.sub('_', ' ', taxon_label_map[t]) for t in prune ])
+                #newtree = displayed_subtree(tree, prune)
             else:
                 sys.stderr.write('pruning tree %d to taxon set %d (using retain)\n' % (tnum, setnum))
-                newtree = displayed_subtree(tree, retain, use_retain=True)
+                newtree = displayed_subtree(tree, [ taxon_label_map[t] for t in retain ], use_retain=True)
+                #newtree = displayed_subtree(tree, [ re.sub('_', ' ', taxon_label_map[t]) for t in retain ], use_retain=True)
+                #newtree = displayed_subtree(tree, retain, use_retain=True)
             if hasattr(newtree, 'as_newick_string'):
                 newtreestr = newtree.as_newick_string()
             else:
-                newtreestr = newtree._as_newick_string()
-            print newtreestr + ';'
+                newtreestr = newtree.as_string(schema='newick', suppress_internal_node_labels=True, suppress_rooting=True)
+            sys.stdout.write('%s' % newtreestr)
 
 
 def same_tree(reference_tree, test_tree):
@@ -456,7 +485,7 @@ trees = None
 prof = cProfile.Profile() if options.profile else None
 
 if options.triplet_file:
-    with open(options.triplet_file) as intrips:
+    with open(options.triplet_file, 'rb') as intrips:
         #first line is a list of all labels, all following lines are triples of taxa
         for line in intrips:
             if not labels:
@@ -465,7 +494,7 @@ if options.triplet_file:
                 triplets.append(line.strip().split())
 
 if options.subset_file:
-    with open(options.subset_file) as subs:
+    with open(options.subset_file, 'rb') as subs:
         for line in subs:
             subsets.append(line.strip().split())
 
@@ -495,7 +524,7 @@ if options.build:
 if options.parents:
     if not options.triplet_file:
         sys.exit('triplet file (-t) must be supplied to count parent tree')
-    print profile_wrapper(superb, prof, labels, triplets, 0)
+    sys.stdout.write('%g\n' % profile_wrapper(superb, prof, labels, triplets, 0))
 
 if options.coverage:
     if not options.alignment_file:
