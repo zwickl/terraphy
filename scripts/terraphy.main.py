@@ -12,6 +12,7 @@ import cProfile, pstats, StringIO
 
 sys.path.append("../")
 from terraphy.triplets import flattened_array_generator
+from terraphy.dendroutils import compat_get_taxon_set, compat_encode_bipartitions
 
 #DENDROPY PACKAGE
 try:
@@ -24,11 +25,6 @@ try:
     except:
         from dendropy.utility.error import DataError
 
-    #this deals with changes in DendroPy 4
-    try:
-        from dendropy.calculate import treesplit
-    except ImportError:
-        from dendropy import treesplit
 
 except ImportError:
     sys.exit('problem importing dendropy package - it is required')
@@ -156,49 +152,32 @@ def compute(label_set, triplets):
 
 
 def my_connected_components(connections):
+    '''This is my custom connected componenets implementation, which is much faster than the
+    pygraph one, which probably has overhead due to its generality.
+    Input is a dictionary of sets, with keys being taxon labels (nodes) and values being other 
+    taxon labels (nodes) to which they are directly connected (i.e., are connected to by an edge). 
+    Note that the values may not be _ALL_ of the nodes to which the keys are connected.
+    Adds each key and set of values to a set, and works on those sets (a "star", like an 
+    asterisk with the center being the key node).
+    Return is a list of sets of connected componenets.
+    '''
     assigned = set()
     components = []
 
-    #connection_stars = [ set([node, *cons]) for node, cons in connections.iteritems() ]
     connection_stars = [ set([node] + list(cons)) for node, cons in connections.iteritems() ]
 
-    #print 'stars', len(connection_stars)
     for star in connection_stars:
         if star & assigned:
-            tojoin = []
-            for comp in components:
-                if star & comp:
-                    tojoin.append(comp)
-            #print 'comp, tojoin[0]', len(components), len(tojoin[0])
-            joined = tojoin[0].union(star, *tojoin[1:])
-            #print 'comp, tojoin[0]', len(components), len(tojoin[0])
+            tojoin = [ comp for comp in components if star & comp ]
+            joined = star.union(*tojoin)
             for rem in tojoin:
                 components.remove(rem)
-            #print 'comp', len(components)
             components.append(joined)
-            #print 'comp', len(components)
-            #components.append(tojoin[0])
-
         else:
             components.append(star)
-        #print 'assigned', len(assigned)
         assigned |= star
-        #print 'assigned', len(assigned)
-        #print components
-        #print 'assigned, all comp', len(assigned), len(components[0].union(*components[1:]))
         assert(assigned == components[0].union(*components[1:]))
 
-    '''
-    print 'len comp', len(components)
-    for comp in components:
-        for comp2 in components:
-            if comp != comp2:
-                #assert(not comp & comp2)
-                if comp & comp2:
-                    print comp & comp2
-                    print sorted(list(comp))
-                    print sorted(list(comp2))
-    '''
     return components
 
 
@@ -311,10 +290,7 @@ def displayed_subtree(tree, labels, use_retain=False):
         else:
             newtree.prune_taxa(labels)
 
-    if hasattr(tree, 'encode_bipartitions'):
-        tree.encode_bipartitions()
-    else:
-        treesplit.encode_splits(newtree)
+    compat_encode_bipartitions(newtree)
     return newtree
 
 
@@ -325,30 +301,17 @@ def print_displayed_subtrees(trees, subsets):
         all_taxa |= subs
     to_prune = [ list(all_taxa - subs) for subs in sub_sets ]
 
-    #labels = [ re.sub('_', ' ', label) for label in labels ]
     for tnum, tree in enumerate(trees):
         tree.is_label_lookup_case_sensitive = True
-        #print type(tree.taxon_namespace[0].label)
-        #taxon_label_map = { re.sub(' ', '_', taxon.label):taxon for taxon in tree.taxon_namespace }
-        if hasattr(tree, 'taxon_namespace'):
-            taxon_label_map = { taxon.label:taxon for taxon in tree.taxon_namespace }
-        else:
-            taxon_label_map = { taxon.label:taxon for taxon in tree.taxon_set }
+        taxon_label_map = { taxon.label:taxon for taxon in compat_get_taxon_set(tree) }
 
-        #print tree
-        #print subsets
-        #print to_prune
         for setnum, (prune, retain) in enumerate(zip(to_prune, subsets)):
             if len(prune) < len(retain):
                 sys.stderr.write('pruning tree %d to taxon set %d\n' % (tnum, setnum))
                 newtree = displayed_subtree(tree, [ taxon_label_map[t] for t in prune ])
-                #newtree = displayed_subtree(tree, [ re.sub('_', ' ', taxon_label_map[t]) for t in prune ])
-                #newtree = displayed_subtree(tree, prune)
             else:
                 sys.stderr.write('pruning tree %d to taxon set %d (using retain)\n' % (tnum, setnum))
                 newtree = displayed_subtree(tree, [ taxon_label_map[t] for t in retain ], use_retain=True)
-                #newtree = displayed_subtree(tree, [ re.sub('_', ' ', taxon_label_map[t]) for t in retain ], use_retain=True)
-                #newtree = displayed_subtree(tree, retain, use_retain=True)
             if hasattr(newtree, 'as_newick_string'):
                 newtreestr = newtree.as_newick_string() + ';\n'
             else:
@@ -362,19 +325,14 @@ def same_tree(reference_tree, test_tree):
     Should handle polytomies fine.
     '''
 
-    ref_tset = reference_tree.taxon_namespace if hasattr(reference_tree, 'taxon_namespace') else reference_tree.taxon_set
-    test_tset = test_tree.taxon_namespace if hasattr(test_tree, 'taxon_namespace') else test_tree.taxon_set
+    ref_tset = compat_get_taxon_set(reference_tree)
+    test_tset = compat_get_taxon_set(test_tree)
     if ref_tset is not test_tset:
         raise TypeError("Trees have different TaxonSet objects: %s vs. %s" \
                 % (hex(id(ref_tset)), hex(id(test_tset))))
-    if hasattr(reference_tree, "encode_bipartitions"):
-       reference_tree.encode_bipartitions()
-    elif not hasattr(reference_tree, "split_edges") or not reference_tree.split_edges:
-        treesplit.encode_splits(reference_tree)
-    if hasattr(test_tree, "encode_bipartitions"):
-       test_tree.encode_bipartitions()
-    elif not hasattr(test_tree, "split_edges") or not test_tree.split_edges:
-        treesplit.encode_splits(test_tree)
+
+    compat_encode_bipartitions(reference_tree)
+    compat_encode_bipartitions(test_tree)
     
     #seems like this set comparison should be faster, but not really
     if isinstance(reference_tree.split_edges, dict):
@@ -403,7 +361,7 @@ def assign_to_terraces(trees, subsets):
     terrace_size = {0:1}
     
     #assign this same TaxonSet to all of the TreeLists created, otherwise bad things happen when trying to compare taxa and splits
-    global_taxon_set = this_tree_subtrees.taxon_namespace if hasattr(this_tree_subtrees, 'taxon_namespace') else this_tree_subtrees.taxon_set
+    global_taxon_set = compat_get_taxon_set(this_tree_subtrees)
     
     #now start with the second tree
     for tree_num, tree in enumerate(trees[1:], 1):
@@ -437,7 +395,7 @@ def assign_to_terraces_using_hashes(trees, subsets):
     #the first tree has to be its own terrace
     #this_tree_subtrees = TreeList( [displayed_subtree(trees[0], subset) for subset in subsets] )
     for tree in trees:
-        treesplit.encode_splits(tree)
+        compat_encode_bipartitions(tree)
 
     this_tree_subtrees = [ sum([ hash(n.edge.split_bitmask) for n in displayed_subtree(trees[0], subset).internal_nodes() ]) for subset in subsets]
     terrace_subtree_list = [this_tree_subtrees]
@@ -464,15 +422,16 @@ def assign_to_terraces_using_hashes(trees, subsets):
 def num_trees(taxa):
     '''The number of tree topologies for the given number of taxa'''
     trees = 0
-    if (taxa == 0):
+    if taxa == 0:
         trees = 0
     elif taxa <= 2:
         trees = 1
     else:
         trees = 1
         for i in xrange(3, taxa + 1):
-            trees *= ((2 * i) -3)
+            trees *= ((2 * i) - 3)
     return trees
+
 
 
 ########################################

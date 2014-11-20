@@ -10,9 +10,31 @@ try:
         from dendropy.error import DataError
     except:
         from dendropy.utility.error import DataError
+    
+    #this deals with changes in DendroPy 4
+    try:
+        from dendropy.calculate import treesplit
+    except ImportError:
+        from dendropy import treesplit
 
 except ImportError:
     sys.exit('problem importing dendropy package - it is required')
+
+
+def compat_get_taxon_set(obj):
+    '''Convenience function dealing with change in Tree/TreeList member name in DP4'''
+    if hasattr(obj, 'taxon_namespace'):
+        return obj.taxon_namespace
+    else:
+        return obj.taxon_set
+
+
+def compat_encode_bipartitions(tree):
+    '''Convenience function dealing with different ways of encoding splits in DP4'''
+    if hasattr(tree, "encode_bipartitions"):
+       tree.encode_bipartitions()
+    elif not hasattr(tree, "split_edges") or not tree.split_edges:
+        treesplit.encode_splits(tree)
 
 
 def dendropy_read_treefile(treefiles, quiet=False, **kwargs):
