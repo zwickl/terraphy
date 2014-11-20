@@ -47,10 +47,7 @@ def find_triplets_defining_edges_descending_from_node(components):
     rotation of clades in a given newick string. 
     '''
 
-    if isinstance(components, str):
-        #shouldn't be getting here because the function won't be recursively called with a leaf
-        sys.exit('find_triplets_defining_edges_descending_from_node() called with leaf?')
-    if len(components) == 1:
+    if isinstance(components, str) or len(components) == 1:
         return []
 
     toReturn = []

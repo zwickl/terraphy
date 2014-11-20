@@ -43,6 +43,9 @@ except ImportError:
 
 
 def profile_wrapper(func, profiler, *args, **kwargs):
+    '''Just a wrapper to enable and disable profiling around
+    a function call
+    '''
     if profiler:
         profiler.enable()
     result = func(*args, **kwargs)
@@ -56,16 +59,13 @@ def build(label_set, triplets, node):
         for label in label_set:
             node.add_child(Node(label=label))
     else:
-        #print 'lab', label_set
-        #print 'trip', triplets
         components = compute(label_set, triplets)
-        #print 'comp', components
         
         if len(components) > 1:
             for comp in components:
-                #print comp
                 if len(comp) == 1:
-                    node.add_child(Node(label=comp[0]))
+                    #can't index sets, so need to use pop
+                    node.add_child(Node(label=comp.pop()))
                 elif len(comp) == 2:
                     new_node = node.add_child(Node())
                     for el in comp:
@@ -82,22 +82,15 @@ def superb(label_set, triplets, num_parents):
     num_parents = 0
     if not triplets:
         num_parents = num_trees(len(label_set))
-        #print 'no trips', num_parents
 
     else:
-        #print 'normal'
-        #print label_set
-        #print triplets
         components = compute(label_set, triplets)
-        #print components
         num_components = len(components)
         
         if num_components > 1:
             num_biparts = 2 ** (num_components - 1) - 1
-            #print num_components, num_biparts
             for i in xrange(1, num_biparts + 1):
                 subset1, subset2 = create_bipartition(components, i)
-                #print subset1, subset2
                 if len(subset1) <= 2:
                     q = 1
                 else:
@@ -123,6 +116,8 @@ def create_bipartition(components, nth):
     creating a biparition.  nth is an index that arbitarily generates one of the possible 
     groupings of the partition components into a bipartition, specifying by converting the 
     integer to a bit string
+    NOTE: argument components MUST be ordered for this to work, so a list, not a set
+    The returned subsets is a pair of sets.
     '''
     num_components = len(components)
     #bin will convert the integer to a binary string, starting with "0b". Slice that off.
@@ -136,7 +131,8 @@ def create_bipartition(components, nth):
 
 
 def winnow_triplets(label_set, triplets):
-    '''Return only those triplets for which all taxa appear in the label_set'''
+    '''Return only those triplets for which all taxa appear in the label_set.
+    label_set can be either a list or set, but this will be much faster as a set'''
     return [ trip for trip in triplets if trip[0] in label_set and trip[1] in label_set and trip[2] in label_set ]
 
 
@@ -146,6 +142,7 @@ def compute(label_set, triplets):
     they appear together in a triplet as the ingroup.  Note that which ingroup label
     is noted as "connected" to the other is arbitrary.
     The triplet outgroups are ignored.
+    label_set argument can be a list or set
     '''
     connections = {lab:set() for lab in label_set}
     try:
@@ -154,12 +151,62 @@ def compute(label_set, triplets):
     except ValueError:
         sys.exit('Could not unpack: %r' % triplets[0])
 
+    #return pygraph_connected_components(connections)
     return my_connected_components(connections)
 
 
 def my_connected_components(connections):
+    assigned = set()
+    components = []
+
+    #connection_stars = [ set([node, *cons]) for node, cons in connections.iteritems() ]
+    connection_stars = [ set([node] + list(cons)) for node, cons in connections.iteritems() ]
+
+    #print 'stars', len(connection_stars)
+    for star in connection_stars:
+        if star & assigned:
+            tojoin = []
+            for comp in components:
+                if star & comp:
+                    tojoin.append(comp)
+            #print 'comp, tojoin[0]', len(components), len(tojoin[0])
+            joined = tojoin[0].union(star, *tojoin[1:])
+            #print 'comp, tojoin[0]', len(components), len(tojoin[0])
+            for rem in tojoin:
+                components.remove(rem)
+            #print 'comp', len(components)
+            components.append(joined)
+            #print 'comp', len(components)
+            #components.append(tojoin[0])
+
+        else:
+            components.append(star)
+        #print 'assigned', len(assigned)
+        assigned |= star
+        #print 'assigned', len(assigned)
+        #print components
+        #print 'assigned, all comp', len(assigned), len(components[0].union(*components[1:]))
+        assert(assigned == components[0].union(*components[1:]))
+
+    '''
+    print 'len comp', len(components)
+    for comp in components:
+        for comp2 in components:
+            if comp != comp2:
+                #assert(not comp & comp2)
+                if comp & comp2:
+                    print comp & comp2
+                    print sorted(list(comp))
+                    print sorted(list(comp2))
+    '''
+    return components
+
+
+def pygraph_connected_components(connections):
     '''Using pygraph, make a graph (see compute function). Determine connected
-    components, and then do a bit of munging to get into correct format
+    components, and then do a bit of munging to get into correct format.
+    return value is a list of lists, with each inner list being one connected component.
+    argument connections is a dictionary
     '''
     mygraph = graph()
     mygraph.add_nodes(connections.keys())
@@ -174,9 +221,12 @@ def my_connected_components(connections):
     #{'A': 1, 'C': 1, 'B': 1, 'E': 2, 'D': 1, 'G': 2, 'F': 2, 'H': 2}
     #need to convert that into actual node sets for each componenet
     #it really doesn't seem like this should be necessary
-    comp = {num:[] for num in xrange(1, max(connect_dict.values()) + 1)}
+    #comp = {num:[] for num in xrange(1, max(connect_dict.values()) + 1)}
+    #for node, compnum in connect_dict.iteritems():
+    #    comp[compnum].append(node)
+    comp = {num:set() for num in xrange(1, max(connect_dict.values()) + 1)}
     for node, compnum in connect_dict.iteritems():
-        comp[compnum].append(node)
+        comp[compnum].add(node)
 
     return comp.values()
 
@@ -280,7 +330,11 @@ def print_displayed_subtrees(trees, subsets):
         tree.is_label_lookup_case_sensitive = True
         #print type(tree.taxon_namespace[0].label)
         #taxon_label_map = { re.sub(' ', '_', taxon.label):taxon for taxon in tree.taxon_namespace }
-        taxon_label_map = { taxon.label:taxon for taxon in tree.taxon_namespace }
+        if hasattr(tree, 'taxon_namespace'):
+            taxon_label_map = { taxon.label:taxon for taxon in tree.taxon_namespace }
+        else:
+            taxon_label_map = { taxon.label:taxon for taxon in tree.taxon_set }
+
         #print tree
         #print subsets
         #print to_prune
@@ -296,7 +350,7 @@ def print_displayed_subtrees(trees, subsets):
                 #newtree = displayed_subtree(tree, [ re.sub('_', ' ', taxon_label_map[t]) for t in retain ], use_retain=True)
                 #newtree = displayed_subtree(tree, retain, use_retain=True)
             if hasattr(newtree, 'as_newick_string'):
-                newtreestr = newtree.as_newick_string()
+                newtreestr = newtree.as_newick_string() + ';\n'
             else:
                 newtreestr = newtree.as_string(schema='newick', suppress_internal_node_labels=True, suppress_rooting=True)
             sys.stdout.write('%s' % newtreestr)
@@ -308,14 +362,20 @@ def same_tree(reference_tree, test_tree):
     Should handle polytomies fine.
     '''
 
-    if reference_tree.taxon_set is not test_tree.taxon_set:
+    ref_tset = reference_tree.taxon_namespace if hasattr(reference_tree, 'taxon_namespace') else reference_tree.taxon_set
+    test_tset = test_tree.taxon_namespace if hasattr(test_tree, 'taxon_namespace') else test_tree.taxon_set
+    if ref_tset is not test_tset:
         raise TypeError("Trees have different TaxonSet objects: %s vs. %s" \
-                % (hex(id(reference_tree.taxon_set)), hex(id(test_tree.taxon_set))))
-    if not hasattr(reference_tree, "split_edges"):
+                % (hex(id(ref_tset)), hex(id(test_tset))))
+    if hasattr(reference_tree, "encode_bipartitions"):
+       reference_tree.encode_bipartitions()
+    elif not hasattr(reference_tree, "split_edges") or not reference_tree.split_edges:
         treesplit.encode_splits(reference_tree)
-    if not hasattr(test_tree, "split_edges"):
+    if hasattr(test_tree, "encode_bipartitions"):
+       test_tree.encode_bipartitions()
+    elif not hasattr(test_tree, "split_edges") or not test_tree.split_edges:
         treesplit.encode_splits(test_tree)
-   
+    
     #seems like this set comparison should be faster, but not really
     if isinstance(reference_tree.split_edges, dict):
         if set(reference_tree.split_edges.keys()) != set(test_tree.split_edges.keys()):
@@ -343,7 +403,7 @@ def assign_to_terraces(trees, subsets):
     terrace_size = {0:1}
     
     #assign this same TaxonSet to all of the TreeLists created, otherwise bad things happen when trying to compare taxa and splits
-    global_taxon_set = this_tree_subtrees.taxon_set
+    global_taxon_set = this_tree_subtrees.taxon_namespace if hasattr(this_tree_subtrees, 'taxon_namespace') else this_tree_subtrees.taxon_set
     
     #now start with the second tree
     for tree_num, tree in enumerate(trees[1:], 1):
@@ -478,7 +538,7 @@ else:
 
 
 labels = []
-triplets = []
+triplets = set()
 subsets = []
 trees = None
 
@@ -491,7 +551,8 @@ if options.triplet_file:
             if not labels:
                 labels = line.strip().split()
             else:
-                triplets.append(line.strip().split())
+                #triplets.append(line.strip().split())
+                triplets.add(tuple(line.strip().split()))
 
 if options.subset_file:
     with open(options.subset_file, 'rb') as subs:

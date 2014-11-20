@@ -12,11 +12,7 @@ try:
 except ImportError:
     sys.exit('problem importing dendropy package - it is required')
 
-#for dendropy 4 compatability
-try:
-    from dendropy.error import DataError
-except ImportError:
-    from dendropy.utility.error import DataError
+from terraphy.dendroutils import dendropy_read_treefile
 
 parser = ArgumentParser(description='Read newick or nexus input trees from file or stdin and output arbitrary taxon triples defining each edge')
 
@@ -24,38 +20,21 @@ parser.add_argument('treefiles', nargs='*', default=[], help='nexus or newick tr
 
 options = parser.parse_args()
 
-
-intrees = dendropy.TreeList()
-if not options.treefiles:
-    sys.stderr.write('NOTE: reading trees from stdin\n')
-    trees = sys.stdin.read()
-    #try two input formats
-    try:
-        intrees.extend(dendropy.TreeList.get_from_string(trees, "nexus"))
-    except DataError:
-        intrees.extend(dendropy.TreeList.get_from_string(trees, "newick"))
-else:
-    for tf in options.treefiles:
-        #try two input formats
-        try:
-            intrees.extend(dendropy.TreeList.get_from_path(tf, "nexus"))
-        except DataError:
-            intrees.extend(dendropy.TreeList.get_from_path(tf, "newick"))
-        except ValueError:
-            sys.stderr.write('NOTE: ValueError reading from file %s, ' % tf)
-        except AttributeError:
-            sys.stderr.write('NOTE: AttributeError reading from file %s, ' % tf)
-
+intrees = dendropy_read_treefile(options.treefiles, suppress_edge_lengths=True)
 sys.stderr.write('read %d trees\n' % len(intrees))
 
 triplets = []
-for tree in intrees:
+for tnum, tree in enumerate(intrees):
     if hasattr(tree, 'as_newick_string'):
         treestr = tree.as_newick_string()
     else:
-        treestr = tree._as_newick_string()
+        treestr = tree.as_string(schema='newick', suppress_edge_lengths=True, suppress_rooting=True)
+    #eliminate any singletons
     treestr = re.sub('([A-Za-z_.-]+)', '"\\1"', treestr)
+    treestr = re.sub(';', '', treestr)
+    #evaluate newick string as set of nested tuples
     triplets.extend(find_triplets_defining_edges_descending_from_node(eval(treestr)))
+    sys.stderr.write('after tree %d: %d triplets\n' % (tnum, len(triplets)))
 
 #collect all labels included in any triplet, which should be the actual number 
 #included in the input trees
@@ -64,6 +43,6 @@ for trip in triplets:
     for tax in trip:
         all_taxa.add(tax)
 
-print ' '.join([tax for tax in sorted(all_taxa)])
-print '\n'.join([' '.join(trip) for trip in triplets])
+sys.stdout.write('%s\n' % ' '.join([tax for tax in sorted(all_taxa)]))
+sys.stdout.write('%s\n' % '\n'.join([' '.join(trip) for trip in triplets]))
 
