@@ -11,8 +11,8 @@ from collections import Iterable
 import cProfile, pstats, StringIO
 
 sys.path.append("../")
-from terraphy.triplets import flattened_array_generator
-from terraphy.dendroutils import compat_get_taxon_set, compat_encode_bipartitions
+from terraphy.triplets import *
+from terraphy.dendroutils import compat_get_taxon_set, compat_encode_bipartitions, dendropy_read_treefile
 
 #DENDROPY PACKAGE
 try:
@@ -48,6 +48,30 @@ def profile_wrapper(func, profiler, *args, **kwargs):
     if profiler:
         profiler.disable()
     return result
+
+
+def calculate_triplets(intrees):
+    triplets = []
+    for tnum, tree in enumerate(intrees):
+        if hasattr(tree, 'as_newick_string'):
+            treestr = tree.as_newick_string()
+        else:
+            treestr = tree.as_string(schema='newick', suppress_edge_lengths=True, suppress_rooting=True)
+        #eliminate any singletons (tips without sisters), remove trailing whitespace or newlines
+        treestr = re.sub('([A-Za-z_.-]+)', '"\\1"', treestr).rstrip()
+        treestr = treestr.rstrip(';')
+        #evaluate newick string as set of nested tuples
+        triplets.extend(find_triplets_defining_edges_descending_from_node(eval(treestr)))
+        sys.stderr.write('after tree %d: %d triplets\n' % (tnum, len(triplets)))
+
+    #collect all labels included in any triplet, which should be the actual number 
+    #included in the input trees
+    all_taxa = set()
+    for trip in triplets:
+        for tax in trip:
+            all_taxa.add(tax)
+
+    return (all_taxa, triplets)
 
 
 def build(label_set, triplets, node):
@@ -440,23 +464,29 @@ parser = ArgumentParser(description='Perform various analyses related to phyloge
 
 in_group = parser.add_argument_group('Input Files')
 
-in_group.add_argument('-t', '--triplet-file', default=None, help='tab or space delimited triplet file, with ingroup ingroup outgroup')
-
-in_group.add_argument('-s', '--subset-file', default=None, help='file with lines indicating sets of taxa represented in various partition subsets')
-
-in_group.add_argument('-a', '--alignment-file', default=None, help='nexus alignment including charsets to be used to determine character partition')
+in_group.add_argument('--alignment-file', default=None, help='nexus alignment including charsets to be used to determine character partition')
 
 in_group.add_argument('--tree-files', nargs="*", default=None, help='nexus or newick tree file(s)')
 
-parser.add_argument('-b', '--build', action='store_true', default=False, help='compute the BUILD tree from a triplet file (requires --triplet-file)')
+in_group.add_argument('--subset-file', default=None, help='file with lines indicating sets of taxa represented in various partition subsets (created by --coverage preprocessing option)')
 
-parser.add_argument('-p', '--parents', action='store_true', default=False, help='compute the number of parent trees given a triplets file (requires --triplet-file')
+in_group.add_argument('--triplet-file', default=None, help='tab or space delimited triplet file, with ingroup ingroup outgroup (created by --triplets preprocessing option)')
 
-parser.add_argument('-c', '--coverage', action='store_true', default=False, help='compute the taxon coverage matrix (aka subsets file, requires --alignment-file)')
+preprocess = parser.add_argument_group('Preprosessing steps to perform on input files.  \nGeneral workflow would be --coverage, --display and --triplets, with each creating output consumed by following steps')
 
-parser.add_argument('-d', '--display', action='store_true', default=False, help='print the subtrees displayed by the input tree with the input subsets (requires --subset-file and --tree-files)')
+preprocess.add_argument('-c', '--coverage', action='store_true', default=False, help='compute the taxon coverage matrix (aka subsets file, requires --alignment-file)')
 
-parser.add_argument('-l', '--list-terraces', action='store_true', default=False, help='take a set of trees and assign them to terraces (requires --subset-file and --tree-files)')
+preprocess.add_argument('-d', '--display', action='store_true', default=False, help='print the subtrees displayed by the input tree with the input subsets (requires --subset-file and --tree-files)')
+
+preprocess.add_argument('-t', '--triplets', action='store_true', default=False, help='Output arbitrary rooted taxon triples defining each edge in a set of treefiles (requires --tree-files')
+
+analyses = parser.add_argument_group('Analyses to be performed on files created by preprocessing')
+
+analyses.add_argument('-p', '--parents', action='store_true', default=False, help='compute the number of parent trees given a triplets file (requires --triplet-file')
+
+analyses.add_argument('-b', '--build', action='store_true', default=False, help='compute the BUILD tree from a triplet file (requires --triplet-file)')
+
+analyses.add_argument('-l', '--list-terraces', action='store_true', default=False, help='take a set of trees and assign them to terraces (requires --subset-file and --tree-files)')
 
 parser.add_argument('--profile', action='store_true', default=False, help='profile the given functionality')
 
@@ -495,7 +525,6 @@ else:
     options = parser.parse_args()
     output_result = sys.stdout.write
 
-
 labels = []
 triplets = set()
 subsets = []
@@ -520,6 +549,11 @@ if options.subset_file:
 
 if options.tree_files:
     trees = dendropy_read_treefile(options.tree_files)
+
+if options.triplets:
+    all_taxa, triplets = calculate_triplets(trees)
+    sys.stdout.write('%s\n' % ' '.join([tax for tax in sorted(all_taxa)]))
+    sys.stdout.write('%s\n' % '\n'.join([' '.join(trip) for trip in triplets]))
 
 if options.build:
     if not options.triplet_file:
