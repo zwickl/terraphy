@@ -74,6 +74,56 @@ def calculate_triplets(intrees):
     return (all_taxa, triplets)
 
 
+class CoverageMatrix(object):
+    def __init__(self, rows=None):
+        self.taxa = set()
+        self.rows = {}
+        self.columns = []
+
+    def fill_from_subsets(self, subsets):
+        self.columns = [set(col) for col in subsets]
+        for col in self.columns:
+            self.taxa |= col
+        self.fill_rows()
+
+    def __getitem__(self, index):
+        if isinstance(index, str):
+            if not self.rows:
+                self.fill_rows()
+            if index in self.rows:
+                return self.rows[index]
+            else:
+                raise KeyError('Taxon %s not found in coverage matrix\n')
+        else:
+            assert(isinstance(index, int))
+            if not self.columns:
+                self.fill_columns()
+            if len(self.columns) < index:
+                return self.columns[index]
+
+    def fill_columns(self, recalculate=False):
+        if self.columns and not recalculate:
+            sys.exit('columns already filled')
+        elif not self.rows:
+            sys.stderr.write('WARNING: filling matrix columns from empty matrix rows')
+        for sub_num in xrange(len(self.rows[0])):
+            self.columns.append([tax[sub_num] for tax in self.rows])
+
+    def fill_rows(self, recalculate=False):
+        if self.rows and not recalculate:
+            sys.exit('taxa already filled')
+        elif not self.columns:
+            sys.stderr.write('WARNING: filling taxa from empty columns')
+        self.rows = { tax:[] for tax in self.taxa }
+        for col_num, col in enumerate(self.columns):
+            col_set = set(col)
+            for tax in self.taxa:
+                if tax in col_set:
+                    self.rows[tax].append(1)
+                else:
+                    self.rows[tax].append(0)
+ 
+
 def build(label_set, triplets, node):
     if not triplets:
         for label in label_set:
@@ -457,6 +507,32 @@ def num_trees(taxa):
     return trees
 
 
+def draw_matrix_graphic(sorted_taxa, matrix, canvas):
+    x_size = max(1, 1152 / len(matrix.rows))
+    y_size = 50 / len(matrix.columns)
+    x_loc, y_loc = 0, 0
+    vertical = False
+    if vertical:
+        for tax, cov in matrix.rows.items():
+            for cell in cov:
+                if cell == 1:
+                    canvas.create_rectangle(x_loc, y_loc, x_loc + x_size, y_loc + y_size, fill="blue")
+                x_loc += x_size
+            y_loc += y_size
+            x_loc = 0
+    else:
+        #taxa = list(mat.taxa)
+        #def cells(tax):
+        #    return sum(mat.rows[tax])
+        #taxa.sort(key=cells, reverse=True)
+        for cov in matrix.columns:
+            for tax in sorted_taxa:
+                if tax in cov:
+                    canvas.create_rectangle(x_loc, y_loc, x_loc + x_size, y_loc + y_size, fill="blue")
+                x_loc += x_size
+            y_loc += y_size
+            x_loc = 0
+
 
 ########################################
 
@@ -491,7 +567,6 @@ analyses.add_argument('-l', '--list-terraces', action='store_true', default=Fals
 parser.add_argument('--profile', action='store_true', default=False, help='profile the given functionality')
 
 #if no arguments are passed, try to start the tkinter gui
-tk_root = None
 if len(sys.argv) == 1:
     try:
         from Tkinter import *
@@ -503,25 +578,15 @@ if len(sys.argv) == 1:
         sys.exit()
 
     tk_root = Tk()
-    tk_gui = ArgparseGui(parser, tk_root, width=1152, height=720, output_frame=True, destroy_when_done=False)
+    tk_gui = ArgparseGui(parser, tk_root, width=1152, height=720, output_frame=True, destroy_when_done=False, graphics_window=True)
 
-    #Need to do this on OS X to bring window to front, otherwise root.lift() should work
-    if 'darwin' in sys.platform.lower():
-        try:
-            #this can give odd non-critical error messages from the OS, so send stderr to devnull
-            retcode = subprocess.call(shlex.split('''/usr/bin/osascript -e 'tell app "Finder" to set frontmost of process "Python" to true' '''), stderr=open(os.devnull, 'wb'))
-        except:
-            #didn't manage to get window to front, but don't worry about it
-            pass
-    else:
-        tk_root.lift()
-   
     tk_root.mainloop()
     if tk_gui.cancelled:
         sys.exit('cancelled ...')
     options = parser.parse_args(tk_gui.make_commandline_list())
     output_result = tk_gui.output_result
 else:
+    tk_root = None
     options = parser.parse_args()
     output_result = sys.stdout.write
 
@@ -546,6 +611,30 @@ if options.subset_file:
     with open(options.subset_file, 'rb') as subs:
         for line in subs:
             subsets.append(line.strip().split())
+
+    '''
+    mat = CoverageMatrix()
+    mat.fill_from_subsets(subsets)
+
+    if tk_root:
+        draw_matrix_graphic(mat.taxa, mat, tk_gui.graphics_canvas)
+        
+        def sort_and_redraw():
+            taxa = list(mat.taxa)
+            def cells(tax):
+                return sum(mat.rows[tax])
+            taxa.sort(key=cells, reverse=True)
+            draw_matrix_graphic(taxa, mat, tk_gui.graphics_canvas)
+
+        tk_gui.sort_button.config(command=sort_and_redraw)
+        tk_root.mainloop()
+
+    else:
+        out_trans = ['-', 'X']
+        for tax, cov in mat.rows.items():
+            sys.stderr.write('%30s\t%s\n' % (tax, ''.join([out_trans[c] for c in cov])))
+    '''
+
 
 if options.tree_files:
     trees = dendropy_read_treefile(options.tree_files)
@@ -578,7 +667,10 @@ if options.build:
 if options.parents:
     if not options.triplet_file:
         sys.exit('triplet file (-t) must be supplied to count parent tree')
-    sys.stdout.write('%g\n' % profile_wrapper(superb, prof, labels, triplets, 0))
+    parents = profile_wrapper(superb, prof, labels, triplets, 0)
+    output_result('%g\n' % parents)
+    if tk_root:
+        tk_root.mainloop()
 
 if options.coverage:
     if not options.alignment_file:
