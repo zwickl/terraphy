@@ -38,6 +38,24 @@ except ImportError:
     sys.exit('problem importing pygraph package - it is required')
 
 
+class MultiWriter(object):
+    def __init__(self, streams):
+        self.streams = streams if isinstance(streams, list) else [streams]
+
+    def add_streams(self, more_streams):
+        if isinstance(more_streams, list):
+            self.streams.extend(more_streams)
+        else:
+            self.streams.append(more_streams)
+
+    def write(self, output, more_streams=None):
+        to_write = self.streams
+        if more_streams:
+            to_write += more_streams if isinstance(more_streams, list) else [more_streams]
+        for stream in to_write:
+            stream(output)
+
+
 def profile_wrapper(func, profiler, *args, **kwargs):
     '''Just a wrapper to enable and disable profiling around
     a function call
@@ -53,10 +71,7 @@ def profile_wrapper(func, profiler, *args, **kwargs):
 def calculate_triplets(intrees):
     triplets = []
     for tnum, tree in enumerate(intrees):
-        if hasattr(tree, 'as_newick_string'):
-            treestr = tree.as_newick_string()
-        else:
-            treestr = tree.as_string(schema='newick', suppress_edge_lengths=True, suppress_rooting=True)
+        treestr = tree.as_string(schema='newick', suppress_edge_lengths=True, suppress_rooting=True, suppress_internal_node_labels=True)
         #eliminate any singletons (tips without sisters), remove trailing whitespace or newlines
         treestr = re.sub('([A-Za-z_.-]+)', '"\\1"', treestr).rstrip()
         treestr = treestr.rstrip(';')
@@ -520,19 +535,19 @@ def draw_matrix_graphic(sorted_taxa, matrix, canvas):
         for tax, cov in matrix.rows.items():
             for cell in cov:
                 if cell == 1:
-                    canvas.create_rectangle(x_loc, y_loc, x_loc + x_size, y_loc + y_size, fill="blue")
+                    canvas.create_rectangle(x_loc, y_loc, x_loc + x_size, y_loc + y_size, fill="blue", outline='blue')
+                else:
+                    canvas.create_rectangle(x_loc, y_loc, x_loc + x_size, y_loc + y_size, fill='white', outline='white')
                 x_loc += x_size
             y_loc += y_size
             x_loc = 0
     else:
-        #taxa = list(mat.taxa)
-        #def cells(tax):
-        #    return sum(mat.rows[tax])
-        #taxa.sort(key=cells, reverse=True)
         for cov in matrix.columns:
             for tax in sorted_taxa:
                 if tax in cov:
-                    canvas.create_rectangle(x_loc, y_loc, x_loc + x_size, y_loc + y_size, fill="blue")
+                    canvas.create_rectangle(x_loc, y_loc, x_loc + x_size, y_loc + y_size, fill="blue", outline='blue')
+                else:
+                    canvas.create_rectangle(x_loc, y_loc, x_loc + x_size, y_loc + y_size, fill='white', outline='white')
                 x_loc += x_size
             y_loc += y_size
             x_loc = 0
@@ -570,6 +585,8 @@ analyses.add_argument('-l', '--list-terraces', action='store_true', default=Fals
 
 parser.add_argument('--profile', action='store_true', default=False, help='profile the given functionality')
 
+writer = MultiWriter(sys.stdout.write)
+
 #if no arguments are passed, try to start the tkinter gui
 if len(sys.argv) == 1:
     try:
@@ -582,13 +599,15 @@ if len(sys.argv) == 1:
         sys.exit()
 
     tk_root = Tk()
-    tk_gui = ArgparseGui(parser, tk_root, width=1152, height=720, output_frame=True, destroy_when_done=False, graphics_window=True)
+    tk_gui = ArgparseGui(parser, tk_root, width=1280, height=720, output_frame=True, destroy_when_done=False, graphics_window=True)
 
     tk_root.mainloop()
     if tk_gui.cancelled:
         sys.exit('cancelled ...')
     options = parser.parse_args(tk_gui.make_commandline_list())
     output_result = tk_gui.output_result
+    writer.add_streams(tk_gui.output_result)
+
 else:
     tk_root = None
     options = parser.parse_args()
@@ -608,7 +627,12 @@ if options.triplet_file:
             if not labels:
                 labels = set(line.strip().split())
             else:
-                triplets.add(tuple(line.strip().split()))
+                trip = line.strip().split()
+                #sort the ingroup taxa, to ensure no effectively identical triplets,
+                #which would presumably come from different input trees
+#                if trip[1] < trip[0]:
+#                    trip[0], trip[1] = trip[1], trip[0]
+                triplets.add(tuple(trip))
 
 if options.subset_file:
     with open(options.subset_file, 'rb') as subs:
@@ -629,7 +653,8 @@ if options.subset_file:
             taxa.sort(key=cells, reverse=True)
             draw_matrix_graphic(taxa, mat, tk_gui.graphics_canvas)
 
-        tk_gui.sort_button.config(command=sort_and_redraw)
+        if hasattr(tk_gui, 'sort_button'):
+            tk_gui.sort_button.config(command=sort_and_redraw)
         tk_root.mainloop()
 
     else:
@@ -643,7 +668,7 @@ if options.tree_files:
     trees = dendropy_read_treefile(options.tree_files)
 
 if options.triplets:
-    all_taxa, triplets = calculate_triplets(trees)
+    all_taxa, triplets = profile_wrapper(calculate_triplets, prof, trees)
     sys.stdout.write('%s\n' % ' '.join([tax for tax in sorted(all_taxa)]))
     sys.stdout.write('%s\n' % '\n'.join([' '.join(trip) for trip in triplets]))
 
@@ -653,7 +678,7 @@ if options.build:
     
     build_tree = Tree()
     profile_wrapper(build, prof, labels, triplets, build_tree.seed_node)
-    output_result('%s\n' % build_tree)
+    writer.write('%s\n' % build_tree)
     
     #could automatically open in a viewer here
     #out_treefilename = 'build.tre'
