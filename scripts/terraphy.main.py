@@ -606,9 +606,8 @@ if options.triplet_file:
         #first line is a list of all labels, all following lines are triples of taxa
         for line in intrips:
             if not labels:
-                labels = line.strip().split()
+                labels = set(line.strip().split())
             else:
-                #triplets.append(line.strip().split())
                 triplets.add(tuple(line.strip().split()))
 
 if options.subset_file:
@@ -654,7 +653,6 @@ if options.build:
     
     build_tree = Tree()
     profile_wrapper(build, prof, labels, triplets, build_tree.seed_node)
-    #build(labels, triplets, build_tree.seed_node)
     output_result('%s\n' % build_tree)
     
     #could automatically open in a viewer here
