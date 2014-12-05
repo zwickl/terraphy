@@ -792,7 +792,7 @@ if options.strict:
         sys.exit('triplet file (-t) must be supplied to make strict consensus tree')
     
     strict_tree = Tree()
-    profile_wrapper(build_or_strict_consensus, prof, labels, triplets, build_tree.seed_node, build=False)
+    profile_wrapper(build_or_strict_consensus, prof, labels, triplets, strict_tree.seed_node, build=False)
     #strict(labels, triplets, strict_tree.seed_node)
     writer.write('%s\n' % strict_tree)
     
