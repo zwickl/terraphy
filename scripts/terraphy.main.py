@@ -203,7 +203,7 @@ def create_bipartition(components, nth):
 def winnow_triplets(label_set, triplets):
     '''Return only those triplets for which all taxa appear in the label_set.
     label_set can be either a list or set, but this will be much faster as a set'''
-    return [ trip for trip in triplets if trip[0] in label_set and trip[1] in label_set and trip[2] in label_set ]
+    return { trip for trip in triplets if trip[0] in label_set and trip[1] in label_set and trip[2] in label_set }
 
 
 def compute(label_set, triplets):
@@ -214,12 +214,15 @@ def compute(label_set, triplets):
     The triplet outgroups are ignored.
     label_set argument can be a list or set
     '''
-    connections = {lab:set() for lab in label_set}
+    #labels are indicated as connected to themselves, which will be handy in my_connected_components
+    connections = {lab:set([lab]) for lab in label_set}
     try:
-        for num, (in1, in2, out) in enumerate(triplets):
+        for in1, in2, out in triplets:
             connections[in1].add(in2)
     except ValueError:
-        sys.exit('Could not unpack: %r' % triplets[0])
+        sys.exit('Could not unpack')
+    except KeyError:
+        raise
 
     #return pygraph_connected_components(connections)
     return my_connected_components(connections)
@@ -229,18 +232,20 @@ def my_connected_components(connections):
     '''This is my custom connected componenets implementation, which is much faster than the
     pygraph one, which probably has overhead due to its generality.
     Input is a dictionary of sets, with keys being taxon labels (nodes) and values being other 
-    taxon labels (nodes) to which they are directly connected (i.e., are connected to by an edge). 
+    taxon labels (nodes) to which they are directly connected (i.e., are connected to by an edge).
+    Assumes that each node has already been added as a value to it's own key.
     Note that the values may not be _ALL_ of the nodes to which the keys are connected.
-    Adds each key and set of values to a set, and works on those sets (a "star", like an 
-    asterisk with the center being the key node).
+    Each of the connections values are all of or part of a connected component.
     Return is a list of sets of connected componenets.
     '''
     assigned = set()
     components = []
 
-    connection_stars = [ set([node] + list(cons)) for node, cons in connections.iteritems() ]
-
-    for star in connection_stars:
+    for star in connections.itervalues():
+        #If any member of this partial component has already been put into a component (possibly
+        #overlapping with multiple components) we'll need to collect anything that overlaps and
+        #then remove the parts that were joined.  I don't see a faster way of doing this, except
+        #maybe using frozensets for each component so that components can more easily be removed
         if star & assigned:
             tojoin = [ comp for comp in components if star & comp ]
             joined = star.union(*tojoin)
@@ -250,7 +255,6 @@ def my_connected_components(connections):
         else:
             components.append(star)
         assigned |= star
-        assert(assigned == components[0].union(*components[1:]))
 
     return components
 
