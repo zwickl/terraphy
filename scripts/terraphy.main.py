@@ -139,28 +139,236 @@ class CoverageMatrix(object):
                     self.rows[tax].append(0)
  
 
+class IncompatibleTripletException(Exception):
+    def __init__(self, value):
+        self.value = value
+    def __str__(self):
+        return repr(self.value)
+
+
 def build(label_set, triplets, node):
     if not triplets:
+        #No triplets, so no internal branches within clade.  So, add polytomy of leaves
         for label in label_set:
             node.add_child(Node(label=label))
     else:
+        #This returns one component for each of the clades descending from this node
+        #The members of the component indicate the labels in each clade
+        #if there is only one component, some triplets are incompatible
         components = compute(label_set, triplets)
         
         if len(components) > 1:
             for comp in components:
                 if len(comp) == 1:
+                    #if only one label in component, add leaf
                     #can't index sets, so need to use pop
                     node.add_child(Node(label=comp.pop()))
                 elif len(comp) == 2:
+                    #if two labels, add cherry
                     new_node = node.add_child(Node())
                     for el in comp:
                         new_node.add_child(Node(label=el))
                 else:
+                    #if > 2 labels in component, filter triplets to only 
+                    #include those in which both ingroups and outgroup 
+                    #are in the label set of the component, i.e. are in 
+                    #the clade of interest
+                    #then add an internal node for that clade and recurse
                     new_trip = winnow_triplets(comp, triplets)
                     new_node = node.add_child(Node())
                     build(comp, new_trip, new_node)
         else:
-            sys.exit('triplets not compatible!')
+            raise IncompatibleTripletException()
+
+
+VERBOSE=False
+def build_or_strict_consensus(label_set, triplets, node, build):
+    '''This function constructs the BUILD tree for given triplets or the strict consensus.
+    The algorithms are essentially the same, the strict consensus just does a lot of
+    extra work to see if an edge occurs in all trees before adding it.
+    '''
+    if not triplets:
+        #No triplets, so no internal branches within clade.  So, add polytomy of leaves
+        for label in label_set:
+            node.add_child(Node(label=label))
+    else:
+        #This returns one component for each of the clades descending from this node
+        #The members of the component indicate the labels in each clade
+        #if there is only one component, some triplets are incompatible
+        components = compute(label_set, triplets)
+        if VERBOSE:
+            print 'TO COMPUTE - build_or_strict'
+            print label_set
+            print triplets
+            print components
+            print '----'
+        
+        if len(components) > 1:
+            for comp in components:
+                if len(comp) == 1:
+                    #if only one label in component, add leaf
+                    #can't index sets, so need to use pop
+                    node.add_child(Node(label=comp.pop()))
+                elif len(comp) == 2:
+                    #if two labels, add a cherry if the branch is in all trees, 
+                    #otherwise add the two leaves to the current node
+                    if VERBOSE:
+                        print '\tTO is edge in all trees - build_or_strict = 2'
+                        print '\t', comp
+                        print '\t', triplets
+                        print '\t----'
+                    if build or is_edge_in_all_trees(comp, label_set, triplets):
+                        new_node = node.add_child(Node())
+                    else:
+                        new_node = node
+                    for el in comp:
+                        new_node.add_child(Node(label=el))
+                else:
+                    #if > 2 labels in component, filter triplets to only 
+                    #include those in which both ingroups and outgroup 
+                    #are in the label set of the component, i.e. are in 
+                    #the clade of interest
+                    #then add an internal node for that clade and recurse
+                    new_trip = winnow_triplets(comp, triplets)
+                    if VERBOSE:
+                        print '\tTO is edge in all trees - build_or_strict > 2'
+                        print '\t', comp
+                        print '\t', triplets
+                        print '\t----'
+                    if build or is_edge_in_all_trees(comp, label_set, triplets):
+                        new_node = node.add_child(Node())
+                    else:
+                        new_node = node
+                    build_or_strict_consensus(comp, new_trip, new_node, build)
+        else:
+            raise IncompatibleTripletException('Input is incompatible!')
+
+
+def strict(label_set, triplets, node):
+    if not triplets:
+        #No triplets, so no internal branches within clade.  So, add polytomy of leaves
+        for label in label_set:
+            node.add_child(Node(label=label))
+    else:
+        #This returns one component for each of the clades descending from this node
+        #The members of the component indicate the labels in each clade
+        #if there is only one component, some triplets are incompatible
+        components = compute(label_set, triplets)
+        if VERBOSE:
+            print 'TO COMPUTE - strict'
+            print label_set
+            print triplets
+            print components
+            print '----'
+        
+        if len(components) > 1:
+            for comp in components:
+                if len(comp) == 1:
+                    #if only one label in component, add leaf
+                    #can't index sets, so need to use pop
+                    node.add_child(Node(label=comp.pop()))
+                elif len(comp) == 2:
+                    #if two labels, add a cherry if the branch is in all trees, 
+                    #otherwise add the two leaves to the current node
+                    if VERBOSE:
+                        print '\tTO is edge in all trees - strict = 2'
+                        print '\t', comp
+                        print '\t', triplets
+                        print '\t----'
+                    if is_edge_in_all_trees(comp, label_set, triplets):
+                        new_node = node.add_child(Node())
+                    else:
+                        new_node = node
+                    for el in comp:
+                        new_node.add_child(Node(label=el))
+                else:
+                    #if > 2 labels in component, filter triplets to only 
+                    #include those in which both ingroups and outgroup 
+                    #are in the label set of the component, i.e. are in 
+                    #the clade of interest
+                    #then add an internal node for that clade and recurse
+                    new_trip = winnow_triplets(comp, triplets)
+                    if VERBOSE:
+                        print '\tTO is edge in all trees - strict > 2'
+                        print '\t', comp
+                        print '\t', triplets
+                        print '\t----'
+                    if is_edge_in_all_trees(comp, label_set, triplets):
+                        new_node = node.add_child(Node())
+                    else:
+                        new_node = node
+                    strict(comp, new_trip, new_node)
+        else:
+            raise IncompatibleTripletException('Input is incompatible!')
+
+
+def is_edge_in_all_trees(in_components, label_set, triplets):
+    out_components = set(label_set)
+    out_components -= in_components
+    in_components = set(in_components)
+    x = in_components.pop()
+    for in_comp in in_components:
+        for out_comp in out_components:
+            for conflict in [set([(x, out_comp, in_comp)]), set([(in_comp, out_comp, x)])]:
+                new_trip = triplets | conflict
+                if VERBOSE:
+                    print '\t\tTO are_triplets_compatible - is_edge_in_all_trees'
+                    print '\t\tadded ', conflict
+                    print '\t\t', label_set
+                    print '\t\t', new_trip
+                    print '\t\t----'
+                if are_triplets_compatible(label_set, new_trip):
+                    return False
+    return True
+
+
+def are_triplets_compatible(label_set, triplets):
+    try:
+        test_triplet_compatibility(label_set, triplets)
+    except IncompatibleTripletException:
+        if VERBOSE:
+            print '\t\t\tincompat!'
+        return False
+
+    if VERBOSE:
+        print '\t\t\tCOMPAT'
+    return True
+
+
+def test_triplet_compatibility(label_set, triplets):
+    '''This is essentially the build algorithm, it just doesn't construct a tree
+    Incompatibilty is indicated by raising an IncompatibleTripletException
+    '''
+    #print '', len(label_set), len(triplets)
+    if not triplets:
+        #No triplets, so no internal branches within clade.
+        return
+    else:
+        #This returns one component for each of the clades descending from this node
+        #The members of the component indicate the labels in each clade
+        #if there is only one component, some triplets are incompatible
+        if VERBOSE:
+            print '\t\t\tTO COMPUTE - test_triplet_compatibility'
+            print '\t\t\t', label_set
+            print '\t\t\t', triplets
+            print '\t\t\t----'
+        components = compute(label_set, triplets)
+        
+        if len(components) > 1:
+            for comp in components:
+                if len(comp) == 1:
+                    pass
+                elif len(comp) == 2:
+                    pass
+                else:
+                    #if > 2 labels in component, filter triplets to only 
+                    #include those in which both ingroups and outgroup 
+                    #are in the label set of the component, i.e. are in 
+                    #the clade of interest
+                    new_trip = winnow_triplets(comp, triplets)
+                    test_triplet_compatibility(comp, new_trip)
+        else:
+            raise IncompatibleTripletException('blah')
 
 
 def superb(label_set, triplets, num_parents):
@@ -338,27 +546,6 @@ def print_subsets(infile):
 
     for locus in range(num_loci):
         print '\t'.join([tax for tax in presence_absence.keys() if presence_absence[tax][locus] == '1'])
-
-
-def dendropy_read_treefile(filenames):
-    intrees = TreeList()
-    for tf in filenames:
-        #try two input formats
-        try:
-            sys.stderr.write('Reading file %s in newick format ...\n' % tf)
-            #intrees.extend(TreeList.get_from_path(tf, "newick"))
-            intrees.extend(TreeList.get_from_path(tf, "newick", preserve_underscores=True))
-        except DataError:
-            sys.stderr.write('Reading file %s in nexus format ...\n' % tf)
-            #intrees.extend(TreeList.get_from_path(tf, "nexus"))
-            intrees.extend(TreeList.get_from_path(tf, "nexus", preserve_underscores=True))
-        except ValueError:
-            sys.exit('ValueError reading from file %s\n' % tf)
-        except AttributeError:
-            sys.exit('AttributeError reading from file %s\n' % tf)
-
-    sys.stderr.write('read %d trees\n' % len(intrees))
-    return intrees
 
 
 def displayed_subtree(tree, labels, use_retain=False):
@@ -581,6 +768,8 @@ analyses.add_argument('-p', '--parents', action='store_true', default=False, hel
 
 analyses.add_argument('-b', '--build', action='store_true', default=False, help='compute the BUILD tree from a triplet file (requires --triplet-file)')
 
+analyses.add_argument('-s', '--strict', action='store_true', default=False, help='compute a strict consensus tree from a triplet file (requires --triplet-file)')
+
 analyses.add_argument('-l', '--list-terraces', action='store_true', default=False, help='take a set of trees and assign them to terraces (requires --subset-file and --tree-files)')
 
 parser.add_argument('--profile', action='store_true', default=False, help='profile the given functionality')
@@ -677,13 +866,33 @@ if options.build:
         sys.exit('triplet file (-t) must be supplied to make BUILD tree')
     
     build_tree = Tree()
-    profile_wrapper(build, prof, labels, triplets, build_tree.seed_node)
+    profile_wrapper(build_or_strict_consensus, prof, labels, triplets, build_tree.seed_node, build=True)
     writer.write('%s\n' % build_tree)
     
     #could automatically open in a viewer here
     #out_treefilename = 'build.tre'
     #with open(out_treefilename, 'w') as outtree:
     #    outtree.write('%s\n' % build_tree)
+    #viewer_command =  shlex.split('java -jar "/Applications/FigTree1.3.1/FigTree v1.3.1.app/Contents/Resources/Java/figtree.jar"')
+    #viewer_command.append(out_treefilename)
+    #subprocess.call(viewer_command)
+    
+    if tk_root:
+        tk_root.mainloop()
+
+if options.strict:
+    if not options.triplet_file:
+        sys.exit('triplet file (-t) must be supplied to make strict consensus tree')
+    
+    strict_tree = Tree()
+    profile_wrapper(build_or_strict_consensus, prof, labels, triplets, build_tree.seed_node, build=False)
+    #strict(labels, triplets, strict_tree.seed_node)
+    writer.write('%s\n' % strict_tree)
+    
+    #could automatically open in a viewer here
+    #out_treefilename = 'strict.tre'
+    #with open(out_treefilename, 'w') as outtree:
+    #    outtree.write('%s\n' % strict_tree)
     #viewer_command =  shlex.split('java -jar "/Applications/FigTree1.3.1/FigTree v1.3.1.app/Contents/Resources/Java/figtree.jar"')
     #viewer_command.append(out_treefilename)
     #subprocess.call(viewer_command)
