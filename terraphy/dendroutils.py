@@ -29,12 +29,12 @@ def compat_get_taxon_set(obj):
         return obj.taxon_set
 
 
-def compat_encode_bipartitions(tree):
+def compat_encode_bipartitions(tree, **kwargs):
     '''Convenience function dealing with different ways of encoding splits in DP4'''
     if hasattr(tree, "encode_bipartitions"):
-       tree.encode_bipartitions()
+       tree.encode_bipartitions(**kwargs)
     elif not hasattr(tree, "split_edges") or not tree.split_edges:
-        treesplit.encode_splits(tree)
+        treesplit.encode_splits(tree, **kwargs)
 
 
 def dendropy_read_treefile(treefiles, quiet=False, **kwargs):

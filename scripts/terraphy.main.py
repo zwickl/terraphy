@@ -499,10 +499,7 @@ def print_displayed_subtrees(trees, subsets):
             else:
                 sys.stderr.write('pruning tree %d to taxon set %d (using retain)\n' % (tnum, setnum))
                 newtree = displayed_subtree(tree, [ taxon_label_map[t] for t in retain ], use_retain=True)
-            if hasattr(newtree, 'as_newick_string'):
-                newtreestr = newtree.as_newick_string() + ';\n'
-            else:
-                newtreestr = newtree.as_string(schema='newick', suppress_internal_node_labels=True, suppress_rooting=True)
+            newtreestr = newtree.as_string(schema='newick', suppress_internal_node_labels=True, suppress_rooting=True)
             sys.stdout.write('%s' % newtreestr)
 
 
@@ -733,7 +730,10 @@ if options.triplet_file:
 if options.subset_file:
     with open(options.subset_file, 'rb') as subs:
         for line in subs:
-            subsets.append(line.strip().split())
+            sub = line.strip().split()
+            #ignore blank lines
+            if sub:
+                subsets.append(sub)
 
     '''
     mat = CoverageMatrix()
