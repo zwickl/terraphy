@@ -70,22 +70,34 @@ def profile_wrapper(func, profiler, *args, **kwargs):
 
 def calculate_triplets(intrees):
     triplets = []
+    all_taxa = set()
     for tnum, tree in enumerate(intrees):
         treestr = tree.as_string(schema='newick', suppress_edge_lengths=True, suppress_rooting=True, suppress_internal_node_labels=True)
         #eliminate any singletons (tips without sisters), remove trailing whitespace or newlines
-        treestr = re.sub('([A-Za-z_.-]+)', '"\\1"', treestr).rstrip()
+        treestr = re.sub('([A-Za-z0-9_.-]+)', '"\\1"', treestr).rstrip()
         treestr = treestr.rstrip(';')
         #evaluate newick string as set of nested tuples
-        triplets.extend(find_triplets_defining_edges_descending_from_node(eval(treestr)))
+        tup_str = eval(treestr)
+        all_taxa |= set( tax for tax in flattened_array_generator(tup_str, 9999999) )
+        triplets.extend(find_triplets_defining_edges_descending_from_node(tup_str))
         sys.stderr.write('after tree %d: %d triplets\n' % (tnum, len(triplets)))
 
     #collect all labels included in any triplet, which should be the actual number 
     #included in the input trees
-    all_taxa = set()
+    '''
+    all_taxa = set([ tax for tax in flattened_array_generator(tup_str, 9999999) ])
+    trip_taxa = set()
     for trip in triplets:
         for tax in trip:
-            all_taxa.add(tax)
+            trip_taxa.add(tax)
 
+    print len(all_taxa), len(trip_taxa)
+    print trip_taxa - all_taxa
+    print all_taxa - trip_taxa
+    print sorted(list(all_taxa))
+    print sorted(list(trip_taxa))
+    exit()
+    '''
     return (all_taxa, triplets)
 
 
@@ -371,21 +383,36 @@ def my_connected_components(connections):
     assigned = set()
     components = []
 
-    for star in connections.itervalues():
-        #If any member of this partial component has already been put into a component (possibly
-        #overlapping with multiple components) we'll need to collect anything that overlaps and
-        #then remove the parts that were joined.  I don't see a faster way of doing this, except
-        #maybe using frozensets for each component so that components can more easily be removed
-        if star & assigned:
-            tojoin = [ comp for comp in components if star & comp ]
-            joined = star.union(*tojoin)
-            for rem in tojoin:
-                components.remove(rem)
-            components.append(joined)
-        else:
-            components.append(star)
-        assigned |= star
+    new = False
 
+    if new:
+        for star in [ set(con) for con in connections.itervalues() ]:
+            if star & assigned:
+                for comp in components:
+                    if comp & star:
+                        star |= comp
+                        components.remove(comp)
+                components.append(star)
+            else:
+                components.append(star)
+            assigned |= star
+    else:
+        for star in connections.itervalues():
+            #If any member of this partial component has already been put into a component (possibly
+            #overlapping with multiple components) we'll need to collect anything that overlaps and
+            #then remove the parts that were joined.  I don't see a faster way of doing this, except
+            #maybe using frozensets for each component so that components can more easily be removed
+            if star & assigned:
+                tojoin = [ comp for comp in components if star & comp ]
+                joined = star.union(*tojoin)
+                for rem in tojoin:
+                    components.remove(rem)
+                components.append(joined)
+            else:
+                components.append(star)
+            assigned |= star
+
+    #print len(components)
     return components
 
 
@@ -477,7 +504,7 @@ def displayed_subtree(tree, labels, use_retain=False):
         else:
             newtree.prune_taxa(labels)
 
-    compat_encode_bipartitions(newtree)
+    compat_encode_bipartitions(newtree, delete_outdegree_one=False)
     return newtree
 
 
