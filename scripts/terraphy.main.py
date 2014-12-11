@@ -275,6 +275,7 @@ def test_triplet_compatibility(label_set, triplets):
         
         if len(components) > 1:
             for comp in components:
+                #these are the cases for a single tip or a cherry
                 if len(comp) == 1:
                     pass
                 elif len(comp) == 2:
@@ -380,18 +381,23 @@ def my_connected_components(connections):
     Each of the connections values are all of or part of a connected component.
     Return is a list of sets of connected componenets.
     '''
+
     assigned = set()
     components = []
-
+    
     new = False
 
     if new:
-        for star in [ set(con) for con in connections.itervalues() ]:
+        #this ends up being slower than the old version, as do other tweaks I tried
+        for star in connections.itervalues():
             if star & assigned:
+                to_remove = []
                 for comp in components:
                     if comp & star:
                         star |= comp
-                        components.remove(comp)
+                        to_remove.append(comp)
+                for comp in to_remove:
+                    components.remove(comp)
                 components.append(star)
             else:
                 components.append(star)
@@ -412,7 +418,6 @@ def my_connected_components(connections):
                 components.append(star)
             assigned |= star
 
-    #print len(components)
     return components
 
 
@@ -801,7 +806,7 @@ if options.build:
     
     build_tree = Tree()
     profile_wrapper(build_or_strict_consensus, prof, labels, triplets, build_tree.seed_node, build=True)
-    writer.write('%s\n' % build_tree)
+    writer.write('%s;\n' % build_tree)
     
     #could automatically open in a viewer here
     #out_treefilename = 'build.tre'
@@ -821,7 +826,7 @@ if options.strict:
     strict_tree = Tree()
     profile_wrapper(build_or_strict_consensus, prof, labels, triplets, strict_tree.seed_node, build=False)
     #strict(labels, triplets, strict_tree.seed_node)
-    writer.write('%s\n' % strict_tree)
+    writer.write('%s;\n' % strict_tree)
     
     #could automatically open in a viewer here
     #out_treefilename = 'strict.tre'
