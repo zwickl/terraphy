@@ -490,8 +490,8 @@ def print_subsets(infile):
 def displayed_subtree(tree, labels, use_retain=False):
     #this is annoying, but Dendropy can consider the labels not matching depending on 
     #underscore vs. space issues
-    #taxa = TaxonSet(tree.taxon_set)
-    #newtree = Tree(tree, taxon_set=taxa)
+    #Realized that using retain_taxa vs prune_taxa doesn't make any difference - dendropy
+    #used prune behind the scenes regardless
     #DP3 vs. DP4 
     if hasattr(tree, 'taxon_namespace'):
         newtree = Tree(tree, taxon_namespace=tree.taxon_namespace)
@@ -518,22 +518,17 @@ def print_displayed_subtrees(trees, subsets):
     all_taxa = set()
     for subs in sub_sets:
         all_taxa |= subs
-    to_prune = [ list(all_taxa - subs) for subs in sub_sets ]
 
     for tnum, tree in enumerate(trees):
         tree.is_label_lookup_case_sensitive = True
         taxon_label_map = { taxon.label:taxon for taxon in compat_get_taxon_set(tree) }
 
-        for setnum, (prune, retain) in enumerate(zip(to_prune, subsets)):
-            if len(prune) < len(retain):
-                sys.stderr.write('pruning tree %d to taxon set %d\n' % (tnum, setnum))
-                newtree = displayed_subtree(tree, [ taxon_label_map[t] for t in prune ])
-            else:
-                sys.stderr.write('pruning tree %d to taxon set %d (using retain)\n' % (tnum, setnum))
-                newtree = displayed_subtree(tree, [ taxon_label_map[t] for t in retain ], use_retain=True)
+        for setnum, retain in enumerate(subsets):
+            sys.stderr.write('pruning tree %d to taxon set %d\n' % (tnum, setnum))
+            newtree = displayed_subtree(tree, [ taxon_label_map[t] for t in retain ], use_retain=True)
             newtreestr = newtree.as_string(schema='newick', suppress_internal_node_labels=True, suppress_rooting=True)
             sys.stdout.write('%s' % newtreestr)
-
+       
 
 def same_tree(reference_tree, test_tree):
     '''This is adapted from false_positives_and_negatives() in dendropy treecalc module,
