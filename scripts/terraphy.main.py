@@ -158,8 +158,7 @@ class IncompatibleTripletException(Exception):
         return repr(self.value)
 
 
-VERBOSE=False
-def build_or_strict_consensus(label_set, triplets, node, build):
+def build_or_strict_consensus(label_set, full_label_set, triplets, all_triplets, node, build, verbose=False):
     '''This function constructs the BUILD tree for given triplets or the strict consensus.
     The algorithms are essentially the same, the strict consensus just does a lot of
     extra work to see if an edge occurs in all trees before adding it.
@@ -173,7 +172,7 @@ def build_or_strict_consensus(label_set, triplets, node, build):
         #The members of the component indicate the labels in each clade
         #if there is only one component, some triplets are incompatible
         components = compute(label_set, triplets)
-        if VERBOSE:
+        if verbose:
             print 'TO COMPUTE - build_or_strict'
             print label_set
             print triplets
@@ -189,12 +188,12 @@ def build_or_strict_consensus(label_set, triplets, node, build):
                 elif len(comp) == 2:
                     #if two labels, add a cherry if the branch is in all trees, 
                     #otherwise add the two leaves to the current node
-                    if VERBOSE:
+                    if verbose:
                         print '\tTO is edge in all trees - build_or_strict = 2'
                         print '\t', comp
                         print '\t', triplets
                         print '\t----'
-                    if build or is_edge_in_all_trees(comp, label_set, triplets):
+                    if build or is_edge_in_all_trees(comp, full_label_set, all_triplets, verbose=verbose):
                         new_node = node.add_child(Node())
                     else:
                         new_node = node
@@ -207,21 +206,21 @@ def build_or_strict_consensus(label_set, triplets, node, build):
                     #the clade of interest
                     #then add an internal node for that clade and recurse
                     new_trip = winnow_triplets(comp, triplets)
-                    if VERBOSE:
+                    if verbose:
                         print '\tTO is edge in all trees - build_or_strict > 2'
                         print '\t', comp
                         print '\t', triplets
                         print '\t----'
-                    if build or is_edge_in_all_trees(comp, label_set, triplets):
+                    if build or is_edge_in_all_trees(comp, full_label_set, all_triplets, verbose=verbose):
                         new_node = node.add_child(Node())
                     else:
                         new_node = node
-                    build_or_strict_consensus(comp, new_trip, new_node, build)
+                    build_or_strict_consensus(comp, full_label_set, new_trip, all_triplets, new_node, build, verbose=verbose)
         else:
             raise IncompatibleTripletException('Input is incompatible!')
 
 
-def is_edge_in_all_trees(in_components, label_set, triplets):
+def is_edge_in_all_trees(in_components, label_set, triplets, verbose=False):
     out_components = set(label_set)
     out_components -= in_components
     in_components = set(in_components)
@@ -230,31 +229,31 @@ def is_edge_in_all_trees(in_components, label_set, triplets):
         for out_comp in out_components:
             for conflict in [set([(x, out_comp, in_comp)]), set([(in_comp, out_comp, x)])]:
                 new_trip = triplets | conflict
-                if VERBOSE:
+                if verbose:
                     print '\t\tTO are_triplets_compatible - is_edge_in_all_trees'
                     print '\t\tadded ', conflict
                     print '\t\t', label_set
                     print '\t\t', new_trip
                     print '\t\t----'
-                if are_triplets_compatible(label_set, new_trip):
+                if are_triplets_compatible(label_set, new_trip, verbose=verbose):
                     return False
     return True
 
 
-def are_triplets_compatible(label_set, triplets):
+def are_triplets_compatible(label_set, triplets, verbose=False):
     try:
-        test_triplet_compatibility(label_set, triplets)
+        test_triplet_compatibility(label_set, triplets, verbose=verbose)
     except IncompatibleTripletException:
-        if VERBOSE:
+        if verbose:
             print '\t\t\tincompat!'
         return False
 
-    if VERBOSE:
+    if verbose:
         print '\t\t\tCOMPAT'
     return True
 
 
-def test_triplet_compatibility(label_set, triplets):
+def test_triplet_compatibility(label_set, triplets, verbose=False):
     '''This is essentially the build algorithm, it just doesn't construct a tree
     Incompatibilty is indicated by raising an IncompatibleTripletException
     '''
@@ -266,12 +265,12 @@ def test_triplet_compatibility(label_set, triplets):
         #This returns one component for each of the clades descending from this node
         #The members of the component indicate the labels in each clade
         #if there is only one component, some triplets are incompatible
-        if VERBOSE:
+        components = compute(label_set, triplets)
+        if verbose:
             print '\t\t\tTO COMPUTE - test_triplet_compatibility'
             print '\t\t\t', label_set
             print '\t\t\t', triplets
             print '\t\t\t----'
-        components = compute(label_set, triplets)
         
         if len(components) > 1:
             for comp in components:
@@ -286,7 +285,7 @@ def test_triplet_compatibility(label_set, triplets):
                     #are in the label set of the component, i.e. are in 
                     #the clade of interest
                     new_trip = winnow_triplets(comp, triplets)
-                    test_triplet_compatibility(comp, new_trip)
+                    test_triplet_compatibility(comp, new_trip, verbose=verbose)
         else:
             raise IncompatibleTripletException('blah')
 
@@ -701,6 +700,8 @@ analyses.add_argument('-b', '--build', action='store_true', default=False, help=
 
 analyses.add_argument('-s', '--strict', action='store_true', default=False, help='compute a strict consensus tree from a triplet file (requires --triplet-file)')
 
+analyses.add_argument('--verbose', action='store_true', default=False, help='spit out extra information for debugging purposes')
+
 analyses.add_argument('-l', '--list-terraces', action='store_true', default=False, help='take a set of trees and assign them to terraces (requires --subset-file and --tree-files)')
 
 parser.add_argument('--profile', action='store_true', default=False, help='profile the given functionality')
@@ -800,7 +801,7 @@ if options.build:
         sys.exit('triplet file (-t) must be supplied to make BUILD tree')
     
     build_tree = Tree()
-    profile_wrapper(build_or_strict_consensus, prof, labels, triplets, build_tree.seed_node, build=True)
+    profile_wrapper(build_or_strict_consensus, prof, labels, set(labels), triplets, triplets, build_tree.seed_node, build=True)
     writer.write('%s;\n' % build_tree)
     
     #could automatically open in a viewer here
@@ -819,7 +820,7 @@ if options.strict:
         sys.exit('triplet file (-t) must be supplied to make strict consensus tree')
     
     strict_tree = Tree()
-    profile_wrapper(build_or_strict_consensus, prof, labels, triplets, strict_tree.seed_node, build=False)
+    profile_wrapper(build_or_strict_consensus, prof, labels, set(labels), triplets, triplets, strict_tree.seed_node, build=False, verbose=options.verbose)
     #strict(labels, triplets, strict_tree.seed_node)
     writer.write('%s;\n' % strict_tree)
     
