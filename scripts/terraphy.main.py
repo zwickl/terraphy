@@ -181,10 +181,15 @@ def build_or_strict_consensus(label_set, full_label_set, triplets, all_triplets,
         
         if len(components) > 1:
             for comp in components:
+                if not comp:
+                    print 'ZERO LENGTH COMPONENT'
+                    sys.exit('ZERO LENGTH COMPONENT')
                 if len(comp) == 1:
                     #if only one label in component, add leaf
                     #can't index sets, so need to use pop
                     node.add_child(Node(label=comp.pop()))
+                    if verbose:
+                        print '\tNEW SINGLETON'
                 elif len(comp) == 2:
                     #if two labels, add a cherry if the branch is in all trees, 
                     #otherwise add the two leaves to the current node
@@ -194,8 +199,12 @@ def build_or_strict_consensus(label_set, full_label_set, triplets, all_triplets,
                         print '\t', triplets
                         print '\t----'
                     if build or is_edge_in_all_trees(comp, full_label_set, all_triplets, verbose=verbose):
-                        new_node = node.add_child(Node())
+                         if verbose:
+                            print '\tNEW CHERRY'
+                         new_node = node.add_child(Node())
                     else:
+                        if verbose:
+                            print '\tREJECTED', comp
                         new_node = node
                     for el in comp:
                         new_node.add_child(Node(label=el))
@@ -212,12 +221,50 @@ def build_or_strict_consensus(label_set, full_label_set, triplets, all_triplets,
                         print '\t', triplets
                         print '\t----'
                     if build or is_edge_in_all_trees(comp, full_label_set, all_triplets, verbose=verbose):
-                        new_node = node.add_child(Node())
+                         if verbose:
+                            print '\tNEW CHERRY'
+                         new_node = node.add_child(Node())
                     else:
+                        if verbose:
+                            print '\tREJECTED', comp
                         new_node = node
                     build_or_strict_consensus(comp, full_label_set, new_trip, all_triplets, new_node, build, verbose=verbose)
         else:
             raise IncompatibleTripletException('Input is incompatible!')
+
+
+def FR_is_edge_in_all_trees(in_components, label_set, FR, verbose=False):
+    out_components = set(label_set)
+    out_components -= in_components
+    in_components = set(in_components)
+    x = in_components.pop()
+    for in_comp in in_components:
+        for out_comp in out_components:
+            for conflict in [set([x, out_comp]), set([in_comp, out_comp])]:
+                if verbose:
+                    print 'TRYING', conflict
+                for split in FR:
+                    if len(split) == 2:
+                        if conflict & split[0] and conflict & split[1]:
+                            #so, can stop checking for this specific conflict
+                            if verbose:
+                                print 'CONFLICT:', conflict, len(split[0]), len(split[1]), split
+                            break
+                        else:
+                            #potential conflict does NOT conflict at this node, 
+                            #so keep checking other nodes
+                            if verbose:
+                                print 'OK:', conflict, len(split[0]), len(split[1]), split
+                            pass
+                else:
+                    #got through checking at all nodes, and none conflict
+                    #so, edge being checked must NOT be in all trees
+                    if verbose:
+                        print 'NO MORE SPLITS'
+                    return False
+    #made it through all of the possible conflicting triples without finding
+    #and that do NOT conflict, so edge must be in all trees
+    return True
 
 
 def is_edge_in_all_trees(in_components, label_set, triplets, verbose=False):
@@ -245,7 +292,7 @@ def are_triplets_compatible(label_set, triplets, verbose=False):
         test_triplet_compatibility(label_set, triplets, verbose=verbose)
     except IncompatibleTripletException:
         if verbose:
-            print '\t\t\tincompat!'
+            print 'INCOMPAT'
         return False
 
     if verbose:
@@ -253,9 +300,62 @@ def are_triplets_compatible(label_set, triplets, verbose=False):
     return True
 
 
-def test_triplet_compatibility(label_set, triplets, verbose=False):
+def test_triplet_compatibility(label_set, triplets, verbose=False, level=1):
     '''This is essentially the build algorithm, it just doesn't construct a tree
     Incompatibilty is indicated by raising an IncompatibleTripletException
+    '''
+    if not triplets:
+        #No triplets, so no internal branches within clade.
+        return
+    else:
+        #This returns one component for each of the clades descending from this node
+        #The members of the component indicate the labels in each clade
+        #if there is only one component, some triplets are incompatible
+        components = compute(label_set, triplets)
+        if verbose:
+            indent = ''.join('\t' for l in xrange(level + 2))
+            print indent, 'TO COMPUTE - test_triplet_compatibility'
+            print indent, label_set
+            print indent, triplets
+            print indent, components
+            print indent, '----'
+
+        if len(components) > 1:
+            for comp in components:
+                if not comp:
+                    print 'ZERO LENGTH COMPONENT'
+                    sys.exit('ZERO LENGTH COMPONENT')
+                #these are the cases for a single tip or a cherry
+                if len(comp) == 1:
+                    if verbose:
+                        print indent, 'COMP LEN 1 - PASS'
+                    pass
+                elif len(comp) == 2:
+                    if verbose:
+                        print indent, 'COMP LEN 2 - PASS'
+                    pass
+                else:
+                    #if > 2 labels in component, filter triplets to only 
+                    #include those in which both ingroups and outgroup 
+                    #are in the label set of the component, i.e. are in 
+                    #the clade of interest
+                    if verbose:
+                        print indent, 'COMP LEN %d - WINNOW AND RECURSE' % len(comp)
+                    new_trip = winnow_triplets(comp, triplets)
+                    test_triplet_compatibility(comp, new_trip, verbose=verbose, level=level+1)
+        else:
+            if verbose:
+                print ''.join('\t' for _ in  xrange(level+2)) ,
+                #print 'INCOMPAT AT LEVEL %d' % level
+                #print components
+            raise IncompatibleTripletException('blah')
+
+
+def compute_FR(label_set, triplets, verbose=False, level=1):
+    '''--------------->>>This does not currently work!
+    This is essentially the build algorithm, and returns a collection of sets representing
+    all clusters (connected components) at each node, instead of computing the connected 
+    components as each node is traversed.
     '''
     #print '', len(label_set), len(triplets)
     if not triplets:
@@ -267,27 +367,37 @@ def test_triplet_compatibility(label_set, triplets, verbose=False):
         #if there is only one component, some triplets are incompatible
         components = compute(label_set, triplets)
         if verbose:
-            print '\t\t\tTO COMPUTE - test_triplet_compatibility'
-            print '\t\t\t', label_set
-            print '\t\t\t', triplets
-            print '\t\t\t----'
-        
+            indent = ''.join('\t' for l in xrange(level))
+            print indent, 'TO COMPUTE - test_triplet_compatibility'
+            print indent, label_set
+            print indent, triplets
+            print indent, components
+            print indent, '----'
+
+        component_list = [list(components)]
         if len(components) > 1:
             for comp in components:
+                if not comp:
+                    print 'ZERO LENGTH COMPONENT'
+                    sys.exit('ZERO LENGTH COMPONENT')
                 #these are the cases for a single tip or a cherry
                 if len(comp) == 1:
                     pass
                 elif len(comp) == 2:
                     pass
                 else:
-                    #if > 2 labels in component, filter triplets to only 
-                    #include those in which both ingroups and outgroup 
-                    #are in the label set of the component, i.e. are in 
-                    #the clade of interest
+                    #if > 2 labels in component, filter triplets to only include those in which both ingroups 
+                    #and outgroup are in the label set of the component, i.e. are in the clade of interest
                     new_trip = winnow_triplets(comp, triplets)
-                    test_triplet_compatibility(comp, new_trip, verbose=verbose)
+                    component_list.extend(compute_FR(comp, new_trip, verbose=verbose, level=level+1))
         else:
+            if verbose:
+                print '%d' % level ,
+                #print 'INCOMPAT AT LEVEL %d' % level
+                #print components
             raise IncompatibleTripletException('blah')
+
+        return component_list
 
 
 def superb(label_set, triplets, num_parents):
