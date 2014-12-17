@@ -282,14 +282,14 @@ def is_edge_in_all_trees(in_components, label_set, triplets, verbose=False):
                     print '\t\t', label_set
                     print '\t\t', new_trip
                     print '\t\t----'
-                if are_triplets_compatible(label_set, new_trip, verbose=verbose):
+                if are_triplets_compatible(label_set, new_trip, conflict, verbose=verbose):
                     return False
     return True
 
 
-def are_triplets_compatible(label_set, triplets, verbose=False):
+def are_triplets_compatible(label_set, triplets, conflict, verbose=False):
     try:
-        test_triplet_compatibility(label_set, triplets, verbose=verbose)
+        test_triplet_compatibility(label_set, triplets, conflict, verbose=verbose)
     except IncompatibleTripletException:
         if verbose:
             print 'INCOMPAT'
@@ -300,7 +300,7 @@ def are_triplets_compatible(label_set, triplets, verbose=False):
     return True
 
 
-def test_triplet_compatibility(label_set, triplets, verbose=False, level=1):
+def test_triplet_compatibility(label_set, triplets, conflict, verbose=False, level=1):
     '''This is essentially the build algorithm, it just doesn't construct a tree
     Incompatibilty is indicated by raising an IncompatibleTripletException
     '''
@@ -339,10 +339,14 @@ def test_triplet_compatibility(label_set, triplets, verbose=False, level=1):
                     #include those in which both ingroups and outgroup 
                     #are in the label set of the component, i.e. are in 
                     #the clade of interest
-                    if verbose:
-                        print indent, 'COMP LEN %d - WINNOW AND RECURSE' % len(comp)
                     new_trip = winnow_triplets(comp, triplets)
-                    test_triplet_compatibility(comp, new_trip, verbose=verbose, level=level+1)
+                    if conflict & new_trip:
+                        if verbose:
+                            print indent, 'COMP LEN %d - WINNOW AND RECURSE' % len(comp)
+                        test_triplet_compatibility(comp, new_trip, conflict, verbose=verbose, level=level+1)
+                    else:
+                        if verbose:
+                            print indent, 'COMP LEN %d - SKIP' % len(comp)
         else:
             if verbose:
                 print ''.join('\t' for _ in  xrange(level+2)) ,
