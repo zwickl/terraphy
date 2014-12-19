@@ -7,6 +7,7 @@ import shlex
 from argparse import ArgumentParser
 from itertools import izip
 from collections import Iterable
+from copy import deepcopy
 
 import cProfile, pstats, StringIO
 
@@ -322,7 +323,11 @@ def is_edge_in_all_trees(in_components, label_set, triplets, verbose=False):
     #intensive set calculated).  Then each conflicting triplet can be added to the components and checked.
     #I think that this can only easily be done at the "root", since the conflicting triplet may change 
     #components further up in the tree
-    precomp = compute(label_set, triplets)
+    
+    #precomp = compute(label_set, triplets)
+    
+    precomp = {}
+    compute_comp_dict(label_set, triplets, precomp)
 
     for in_comp in in_components:
         for out_comp in out_components:
@@ -347,9 +352,12 @@ def is_edge_in_all_trees(in_components, label_set, triplets, verbose=False):
                         print '\t\t%d' % len(label_set), label_set
                         print '\t\t%d' % len(new_trip), new_trip
                     print '\t\t----'
-                #if are_triplets_compatible(label_set, new_trip, conflict, precomp=precomp, verbose=verbose):
-                if are_triplets_compatible(label_set, new_trip, conflict, precomp=list(precomp), verbose=verbose):
-                    return False
+                if isinstance(precomp, dict):
+                    if are_triplets_compatible(label_set, new_trip, conflict, precomp=precomp, verbose=verbose):
+                        return False
+                else:
+                    if are_triplets_compatible(label_set, new_trip, conflict, precomp=list(precomp), verbose=verbose):
+                        return False
     return True
 
 
@@ -438,12 +446,27 @@ def root_test_triplet_compatibility(label_set, triplets, conflict, precomp=None,
         #The members of the component indicate the labels in each clade
         #if there is only one component, some triplets are incompatible
         if precomp:
-            components = compute(set((list(conflict)[0][:2])), conflict, precomp)
+            #components = compute(set((list(conflict)[0][:2])), conflict, precomp)
+            
+            if isinstance(precomp, list):
+                if verbose:
+                    print 'Using list precomp'
+                components = compute(set((list(conflict)[0][:2])), conflict, precomp)
+            else:
+                if frozenset(label_set) in precomp:
+                    if verbose:
+                        print 'Using comp_dict'
+                    components = compute(set((list(conflict)[0][:2])), conflict, precomp[frozenset(label_set)])
+                else:
+                    if verbose:
+                        print 'Not in comp_dict'
+                    components = compute(label_set, triplets)
+            
         else:
             components = compute(label_set, triplets)
         if verbose:
             indent = ''.join('\t' for l in xrange(level + 2))
-            print indent, 'AFTER COMPUTE - test_triplet_compatibility'
+            print indent, 'AFTER COMPUTE - root_test_triplet_compatibility'
             if precomp:
                 print indent, 'Used precomputed components'
             if len(label_set) > 20:
@@ -477,7 +500,11 @@ def root_test_triplet_compatibility(label_set, triplets, conflict, precomp=None,
                     if conflict & new_trip:
                         if verbose:
                             print indent, 'COMP LEN %d - WINNOW AND RECURSE' % len(comp)
-                        test_triplet_compatibility(comp, new_trip, conflict, verbose=verbose, level=level+1)
+                        
+                        if isinstance(precomp, dict) and frozenset(comp) in precomp:
+                            root_test_triplet_compatibility(comp, new_trip, conflict, precomp=precomp, verbose=verbose, level=level+1)
+                        else:
+                            test_triplet_compatibility(comp, new_trip, conflict, verbose=verbose, level=level+1)
                     else:
                         if verbose:
                             print indent, 'COMP LEN %d - SKIP' % len(comp)
@@ -536,6 +563,47 @@ def compute_FR(label_set, triplets, verbose=False, level=1):
             raise IncompatibleTripletException('blah')
 
         return component_list
+
+
+def compute_comp_dict(label_set, triplets, comp_dict, verbose=False, level=1):
+    
+    if not triplets:
+        return
+    else:
+        #This returns one component for each of the clades descending from this node
+        #The members of the component indicate the labels in each clade
+        #if there is only one component, some triplets are incompatible
+        components = compute(label_set, triplets)
+        comp_dict[frozenset(label_set)] = components
+        if verbose:
+            indent = ''.join('\t' for l in xrange(level))
+            print indent, 'AFTER COMPUTE - test_triplet_compatibility'
+            print indent, label_set
+            print indent, triplets
+            print indent, components
+            print indent, '----'
+
+        if len(components) > 1:
+            for comp in components:
+                if not comp:
+                    print 'ZERO LENGTH COMPONENT'
+                    sys.exit('ZERO LENGTH COMPONENT')
+                #these are the cases for a single tip or a cherry
+                if len(comp) == 1:
+                    pass
+                elif len(comp) == 2:
+                    pass
+                else:
+                    #if > 2 labels in component, filter triplets to only include those in which both ingroups 
+                    #and outgroup are in the label set of the component, i.e. are in the clade of interest
+                    new_trip = winnow_triplets(comp, triplets)
+                    compute_comp_dict(comp, new_trip, comp_dict, verbose=verbose, level=level+1)
+        else:
+            if verbose:
+                print '%d' % level ,
+                #print 'INCOMPAT AT LEVEL %d' % level
+                #print components
+            raise IncompatibleTripletException('blah')
 
 
 def superb(label_set, triplets, num_parents):
@@ -640,6 +708,7 @@ def my_connected_components(connections, precomp=None):
         #components have been precomputed, but we want to add some connections
         components = precomp
         assigned = precomp[0].union(*precomp[1:])
+        dcopied = False
     else:
         components = []
         assigned = set()
@@ -663,16 +732,27 @@ def my_connected_components(connections, precomp=None):
         for star in connections.itervalues():
             #If any member of this partial component has already been put into a component (possibly
             #overlapping with multiple components) we'll need to collect anything that overlaps and
-            #then remove the parts that were joined.  I don't see a faster way of doing this, except
-            #maybe using frozensets for each component so that components can more easily be removed
+            #then remove the parts that were joined from the component list.  I don't see a faster 
+            #way of doing this, except maybe using frozensets for each component so that components 
+            #can more easily be removed
             if star & assigned:
                 tojoin = [ comp for comp in components if star & comp ]
                 joined = star.union(*tojoin)
-                #seems like the listcomp might be faster here, but it isn't
-                #components = [ comp for comp in components if comp not in tojoin ]
-                for rem in tojoin:
-                    components.remove(rem)
-                components.append(joined)
+                
+                #if this isn't true, then the existing components won't be changed by including this star
+                if len(tojoin) > 1 or joined != tojoin[0]:
+                    if precomp and not dcopied:
+                        #In this case the precomputed components (list of sets) will have to be 
+                        #altered, which would change their values in the comp dictionary and screw 
+                        #up their use in the future. So, copy to a new list that will be returned
+                        print "COPIED"
+                        components = deepcopy(components)
+                        dcopied = True
+                    #seems like the listcomp might be faster here, but it isn't
+                    #components = [ comp for comp in components if comp not in tojoin ]
+                    for rem in tojoin:
+                        components.remove(rem)
+                    components.append(joined)
             else:
                 components.append(star)
             assigned |= star
