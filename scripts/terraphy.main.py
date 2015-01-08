@@ -32,24 +32,36 @@ except ImportError:
 
 
 #PYGRAPH PACKAGE
+'''
+#Implemented own connected components, so not currently using this
 try:
     from pygraph.classes.graph import graph
     from pygraph.algorithms.accessibility import connected_components
 except ImportError:
     sys.exit('problem importing pygraph package - it is required')
-
+'''
 
 class MultiWriter(object):
+    '''A class that collects a number of output stream write methods and then calls all
+    of them when desired.  Useful for example for sending output to Tkinter window
+    and stdout without having to do cluter up code.
+    Streams are actually the write methods of the given streams, i.e.
+    stdout.write would be passed rather than stdout
+    '''
     def __init__(self, streams):
         self.streams = streams if isinstance(streams, list) else [streams]
 
     def add_streams(self, more_streams):
+        '''Append extra streams to always write to'''
         if isinstance(more_streams, list):
             self.streams.extend(more_streams)
         else:
             self.streams.append(more_streams)
 
     def write(self, output, more_streams=None):
+        '''Call the collected write methods with the output string, plus any one time 
+        streams passed in
+        '''
         to_write = self.streams
         if more_streams:
             to_write += more_streams if isinstance(more_streams, list) else [more_streams]
@@ -70,6 +82,9 @@ def profile_wrapper(func, profiler, *args, **kwargs):
 
 
 def calculate_triplets(intrees):
+    '''Choose a set of rooted triplets that define each edge of the input trees.  See the 
+    terraphy.triplets find_triplets_defining_edges_descending_from_node function
+    '''
     triplets = []
     all_taxa = set()
     for tnum, tree in enumerate(intrees):
@@ -82,39 +97,30 @@ def calculate_triplets(intrees):
         all_taxa |= set( tax for tax in flattened_array_generator(tup_str, 9999999) )
         triplets.extend(find_triplets_defining_edges_descending_from_node(tup_str))
         sys.stderr.write('after tree %d: %d triplets\n' % (tnum, len(triplets)))
-
-    #collect all labels included in any triplet, which should be the actual number 
-    #included in the input trees
-    '''
-    all_taxa = set([ tax for tax in flattened_array_generator(tup_str, 9999999) ])
-    trip_taxa = set()
-    for trip in triplets:
-        for tax in trip:
-            trip_taxa.add(tax)
-
-    print len(all_taxa), len(trip_taxa)
-    print trip_taxa - all_taxa
-    print all_taxa - trip_taxa
-    print sorted(list(all_taxa))
-    print sorted(list(trip_taxa))
-    exit()
-    '''
+    
     return (all_taxa, triplets)
 
 
 class CoverageMatrix(object):
+    '''A class to hold information on the pattern of missing data in a matrix.
+    '''
     def __init__(self, rows=None):
+        '''Rows are the taxa, columns the loci.
+        '''
         self.taxa = set()
         self.rows = {}
         self.columns = []
 
     def fill_from_subsets(self, subsets):
+        '''Each subset is a list of taxa present for a given locus
+        '''
         self.columns = [set(col) for col in subsets]
         for col in self.columns:
             self.taxa |= col
         self.fill_rows()
 
     def __getitem__(self, index):
+        '''Pull information out of the coverage matrix, indexing taxa by name or number'''
         if isinstance(index, str):
             if not self.rows:
                 self.fill_rows()
@@ -130,6 +136,7 @@ class CoverageMatrix(object):
                 return self.columns[index]
 
     def fill_columns(self, recalculate=False):
+        '''Fill the column attribute from the rows'''
         if self.columns and not recalculate:
             sys.exit('columns already filled')
         elif not self.rows:
@@ -138,6 +145,7 @@ class CoverageMatrix(object):
             self.columns.append([tax[sub_num] for tax in self.rows])
 
     def fill_rows(self, recalculate=False):
+        '''Fill the rows from the columns'''
         if self.rows and not recalculate:
             sys.exit('taxa already filled')
         elif not self.columns:
@@ -153,6 +161,7 @@ class CoverageMatrix(object):
  
 
 class IncompatibleTripletException(Exception):
+    '''An exception to allow escape from potentially deep recursion when looking for incompatible triplets'''
     def __init__(self, value):
         self.value = value
     def __str__(self):
@@ -160,6 +169,7 @@ class IncompatibleTripletException(Exception):
 
 
 def debug_output(label_set, triplets, components, level=0):
+    '''Specialized debug output for strict consensus computation'''
     indent = ''.join('\t' for l in xrange(level))
     if len(label_set) > 10:
         print indent, '%d labels, %d trips, %d comp' % (len(label_set or ''), len(triplets or ''), len(components or ''))
@@ -178,8 +188,6 @@ def build_or_strict_consensus(label_set, full_label_set, triplets, all_triplets,
     The algorithms are essentially the same, the strict consensus just does a lot of
     extra work to see if an edge occurs in all trees before adding it.
     '''
-
-    #FR = FR or compute_FR(full_label_set, all_triplets, verbose=verbose, level=1) 
 
     if not triplets:
         #No triplets, so no internal branches within clade.  So, add polytomy of leaves
@@ -244,80 +252,6 @@ def build_or_strict_consensus(label_set, full_label_set, triplets, all_triplets,
             raise IncompatibleTripletException('Input is incompatible!')
 
 
-def FR_is_edge_in_all_trees(in_components, label_set, FR, verbose=False):
-    out_components = set(label_set)
-    out_components -= in_components
-    in_components = set(in_components)
-    x = in_components.pop()
-    for in_comp in in_components:
-        for out_comp in out_components:
-            for conflict in [set([x, out_comp]), set([in_comp, out_comp])]:
-                if verbose:
-                    print 'TRYING', conflict
-                for split in FR:
-                    if len(split) == 2:
-                        if conflict & split[0] and conflict & split[1]:
-                            #so, can stop checking for this specific conflict
-                            if verbose:
-                                print 'CONFLICT:', conflict, len(split[0]), len(split[1]), split
-                            break
-                        else:
-                            #potential conflict does NOT conflict at this node, 
-                            #so keep checking other nodes
-                            if verbose:
-                                print 'OK:', conflict, len(split[0]), len(split[1]), split
-                            pass
-                    else:
-                        assert(len(split) > 2)
-
-                        count = sum([1 for comp in split if comp & conflict])
-                        if count == 2:
-                            #so, can stop checking for this specific conflict
-                            if verbose:
-                                print 'multiCONFLICT:', conflict, len(split[0]), len(split[1]), split
-                            break
-                        elif count == 1:
-                            #potential conflict does NOT conflict at this node, 
-                            #so keep checking other nodes
-                            if verbose:
-                                print 'multiOK:', conflict, len(split[0]), len(split[1]), split
-                            pass
-                        else:
-                            sys.exit('count = %d?' % count)
-
-                        '''
-                        int1 = set()
-                        int2 = set()
-                        for comp in split:
-                            if conflict[0] & comp:
-                                int1 = comp
-                            if conflict[1] & comp:
-                                int2 = comp
-
-                        assert(int1 and int2)
-                        if int1 is not int2:
-                            #so, can stop checking for this specific conflict
-                            if verbose:
-                                print 'multiCONFLICT:', conflict, len(split[0]), len(split[1]), split
-                            break
-                        else:
-                            #potential conflict does NOT conflict at this node, 
-                            #so keep checking other nodes
-                            if verbose:
-                                print 'multiOK:', conflict, len(split[0]), len(split[1]), split
-                            pass
-                        '''
-                else:
-                    #got through checking at all nodes, and none conflict
-                    #so, edge being checked must NOT be in all trees
-                    if verbose:
-                        print 'NO MORE SPLITS'
-                    return False
-    #made it through all of the possible conflicting triples without finding
-    #and that do NOT conflict, so edge must be in all trees
-    return True
-
-
 def is_edge_in_all_trees(in_components, label_set, triplets, verbose=False):
     out_components = set(label_set)
     out_components -= in_components
@@ -331,7 +265,7 @@ def is_edge_in_all_trees(in_components, label_set, triplets, verbose=False):
     #this is the old method, precomputing only the root components
     #precomp = compute(label_set, triplets)
     
-    #make a dictionary, indexed by frozensets of label_sets
+    #make a dictionary of precomputed connected componenets, indexed by frozensets of label_sets
     precomp = {}
     compute_comp_dict(label_set, triplets, precomp)
 
@@ -354,7 +288,7 @@ def is_edge_in_all_trees(in_components, label_set, triplets, verbose=False):
                     print '\t\tadded ', conflict
                     debug_output(label_set, new_trip, None, 2)
                 
-                #the new and old versions
+                #the new and old versions, with precomp of components at many nodes, or at only the root
                 if isinstance(precomp, dict):
                     if are_triplets_compatible(label_set, new_trip, conflict, precomp=precomp, verbose=verbose):
                         return False
@@ -365,10 +299,17 @@ def is_edge_in_all_trees(in_components, label_set, triplets, verbose=False):
 
 
 def are_triplets_compatible(label_set, triplets, conflict, precomp=None, verbose=False):
+    '''Test compatibility of a set of triplets, starting a recursion into a function similar to BUILD.
+    It is really more specialized than that, and assumes that a particular potentially conflicting triplet
+    has already been added to the list of triplets, as well as passed as the conflict argument.  Used 
+    in strict consensus computation. Incompatibility is indicated by catching an IncompatibleTripletException
+    raised during recursion, compatibility by returning from recursion without an exception.
+    May use precomputed connected components.  
+    '''
     try:
         #call the root version, which may then recurse into normal test_triplet_compatibility, 
         #which doesn't use the precomputed components
-        root_test_triplet_compatibility(label_set, triplets, conflict, precomp, verbose=verbose)
+        precomp_test_triplet_compatibility(label_set, triplets, conflict, precomp, verbose=verbose)
     except IncompatibleTripletException:
         if verbose:
             print 'INCOMPAT'
@@ -433,9 +374,9 @@ def test_triplet_compatibility(label_set, triplets, conflict, verbose=False, lev
             raise IncompatibleTripletException('blah')
 
 
-def root_test_triplet_compatibility(label_set, triplets, conflict, precomp=None, verbose=False, level=1):
-    '''This is as test_triplet_compatibility, but allows for passing of precomputed components at the root
-    It is currently a separate function to allow specific tracking during profiling
+def precomp_test_triplet_compatibility(label_set, triplets, conflict, precomp=None, verbose=False, level=1):
+    '''This is as test_triplet_compatibility, but allows for passing of precomputed components
+    It is mainly a separate function to allow specific tracking during profiling
     '''
     if not triplets:
         #No triplets, so no internal branches within clade.
@@ -446,9 +387,8 @@ def root_test_triplet_compatibility(label_set, triplets, conflict, precomp=None,
         #The members of the component indicate the labels in each clade
         #if there is only one component, some triplets are incompatible
         if precomp:
-            #components = compute(set((list(conflict)[0][:2])), conflict, precomp)
-            
             if isinstance(precomp, list):
+                #This is the older way, where the only precomp was for the root
                 if verbose:
                     print indent, 'Using list precomp'
                 components = compute(set((list(conflict)[0][:2])), conflict, precomp)
@@ -465,7 +405,7 @@ def root_test_triplet_compatibility(label_set, triplets, conflict, precomp=None,
         else:
             components = compute(label_set, triplets)
         if verbose:
-            print indent, 'AFTER COMPUTE - root_test_triplet_compatibility'
+            print indent, 'AFTER COMPUTE - precomp_test_triplet_compatibility'
             if precomp:
                 print indent, 'Used precomputed components'
             debug_output(label_set, triplets, components, level+2)
@@ -495,7 +435,7 @@ def root_test_triplet_compatibility(label_set, triplets, conflict, precomp=None,
                             print indent, 'COMP LEN %d - WINNOW AND RECURSE' % len(comp)
                         
                         if isinstance(precomp, dict) and frozenset(comp) in precomp:
-                            root_test_triplet_compatibility(comp, new_trip, conflict, precomp=precomp, verbose=verbose, level=level+1)
+                            precomp_test_triplet_compatibility(comp, new_trip, conflict, precomp=precomp, verbose=verbose, level=level+1)
                         else:
                             test_triplet_compatibility(comp, new_trip, conflict, verbose=verbose, level=level+1)
                     else:
@@ -505,55 +445,6 @@ def root_test_triplet_compatibility(label_set, triplets, conflict, precomp=None,
             if verbose:
                 print ''.join('\t' for _ in  xrange(level+2)) ,
             raise IncompatibleTripletException('blah')
-
-
-def compute_FR(label_set, triplets, verbose=False, level=1):
-    '''--------------->>>This does not currently work!
-    This is essentially the build algorithm, and returns a collection of sets representing
-    all clusters (connected components) at each node, instead of computing the connected 
-    components as each node is traversed.
-    '''
-    #print '', len(label_set), len(triplets)
-    if not triplets:
-        #No triplets, so no internal branches within clade.
-        return
-    else:
-        #This returns one component for each of the clades descending from this node
-        #The members of the component indicate the labels in each clade
-        #if there is only one component, some triplets are incompatible
-        components = compute(label_set, triplets)
-        if verbose:
-            indent = ''.join('\t' for l in xrange(level))
-            print indent, 'AFTER COMPUTE - test_triplet_compatibility'
-            print indent, label_set
-            print indent, triplets
-            print indent, components
-            print indent, '----'
-
-        component_list = [list(components)]
-        if len(components) > 1:
-            for comp in components:
-                if not comp:
-                    print 'ZERO LENGTH COMPONENT'
-                    sys.exit('ZERO LENGTH COMPONENT')
-                #these are the cases for a single tip or a cherry
-                if len(comp) == 1:
-                    pass
-                elif len(comp) == 2:
-                    pass
-                else:
-                    #if > 2 labels in component, filter triplets to only include those in which both ingroups 
-                    #and outgroup are in the label set of the component, i.e. are in the clade of interest
-                    new_trip = winnow_triplets(comp, triplets)
-                    component_list.extend(compute_FR(comp, new_trip, verbose=verbose, level=level+1))
-        else:
-            if verbose:
-                print '%d' % level ,
-                #print 'INCOMPAT AT LEVEL %d' % level
-                #print components
-            raise IncompatibleTripletException('blah')
-
-        return component_list
 
 
 def compute_comp_dict(label_set, triplets, comp_dict, verbose=False, level=1):
@@ -595,6 +486,8 @@ def compute_comp_dict(label_set, triplets, comp_dict, verbose=False, level=1):
 
 
 def superb(label_set, triplets, num_parents):
+    '''SUPERB algorithm of Constantinescu and Sankoff, 1995, to count number of parent trees
+    compatible with given set of triplets'''
     num_parents = 0
     if not triplets:
         num_parents = num_trees(len(label_set))
