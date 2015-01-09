@@ -230,11 +230,9 @@ def build_or_strict_consensus(label_set, full_label_set, triplets, all_triplets,
                     for el in comp:
                         new_node.add_child(Node(label=el))
                 else:
-                    #if > 2 labels in component, filter triplets to only 
-                    #include those in which both ingroups and outgroup 
-                    #are in the label set of the component, i.e. are in 
-                    #the clade of interest
-                    #then add an internal node for that clade and recurse
+                    #if > 2 labels in component, filter triplets to only include those in which both ingroups and outgroup 
+                    #are in the label set of the component, i.e. are in the clade of interest
+                    #then if necessary add an internal node for that clade and recurse
                     new_trip = winnow_triplets(comp, triplets)
                     if verbose:
                         print '\tTO is_edge_in_all_trees - build_or_strict > 2'
@@ -253,15 +251,51 @@ def build_or_strict_consensus(label_set, full_label_set, triplets, all_triplets,
 
 
 def is_edge_in_all_trees(in_components, label_set, triplets, verbose=False):
+    '''This is the heart of the Steel 1992 strict consensus algorithm.  To verify that an edge appears in all trees
+    one needs to take the entire set of triplets, and iterate one by one over lots of other triplets that would conflict
+    with the edge of interest.  The edge only appears in every tree if every one of those potentially conflicting triplets (PCTs)
+    does conflict with the original set of triplets.  The procedure is:
+
+    -Divide all labels into an ingroup set (those descending from the edge to be tested) and an outgroup set (all others)
+    -Arbitrarily choose one of the ingroup labels to be a reference (x)
+    -Iterate through all possible combinations of one of the remaining ingroup label (in_comp) and one outgroup label (out_comp)
+    -For each combination of x, in_comp and out_comp, the real triplet resolution is obviously ((x, in_comp), out_comp), so the 
+        PCTs are ((x, out_comp), in_comp) and ((in_comp, out_comp), x). Each is tested in turn by adding it to the set of real 
+        triplets
+    -To test for compatibility (which indicates that the edge of interest does NOT appear in all trees and therefore in the 
+        strint consensus), a simplified version of the BUILD algorithm is used.  The set of triplets is recursively analyzed
+        by calculating the connected components of a given set of triplets (clades descending from the current "node"), and
+        recursing into each of those clades, after winnowing the triplets to only those contained in the clade.  The entire
+        recursion starts with the entire set of triplets (at the root).
+    -During the recursion, incompatibilty is indicated by only a single connected component of size > 2 existing at a given node
+
+    Other notes:
+    -If compatibilty is verified for any of the PCTs, the entire procedure is terminated, returning False from this function
+    -During the testing of a particular PCT, once incompatibility is verfied at a given node the recursion is terminated
+        for that PCT, moving on to the next one
+    -This function only returns True if every single PCT is interated through and proven incompatible.
+
+    There are a number of shortcuts that avoid full testing:
+    -If a triplet exists on the same label set as a given PCT (i.e., ((x, in_comp), out_comp) is one of the real triplets)
+        then recursion isn't necessary, incompatibilty is certain
+    -During recursion, if the PCT is winnowed (i.e., not entirely contained within a clade), recursion into that clade
+        isn't necessary (it can't conflict there)
+    
+    Optimizations:
+    -In a naive implementation the most intensive computation comes from the computation of the connected components.
+        However, they are determined directly from the set of triplets, and that set is exactly the same every time
+        besides the addition of single PCTs.  So, it is possible to precompute the connected components induced by 
+        a given label set (i.e., a given set of real triplets), and then just add the PCT to the computed components.
+        That requires looking up the components induced by particular label sets, which is done with a dict indexed
+        by frozensets of labels.
+    '''
+
+
     out_components = set(label_set)
     out_components -= in_components
     in_components = set(in_components)
     x = in_components.pop()
 
-    #Precompute the componenets that are induced by all of the triplets (the most frequent and most
-    #intensive set calculated).  Then each conflicting triplet can be added to the components and checked.
-    #UPDATE - added precomp of whole tree of componenets, usable under certain conditions
-    
     #this is the old method, precomputing only the root components
     #precomp = compute(label_set, triplets)
     
@@ -354,10 +388,8 @@ def test_triplet_compatibility(label_set, triplets, conflict, verbose=False, lev
                         print indent, 'COMP LEN 2 - PASS'
                     pass
                 else:
-                    #if > 2 labels in component, filter triplets to only 
-                    #include those in which both ingroups and outgroup 
-                    #are in the label set of the component, i.e. are in 
-                    #the clade of interest
+                    #if > 2 labels in component, filter triplets to only include those in which both ingroups and outgroup 
+                    #are in the label set of the component, i.e. are in the clade of interest
                     
                     #doing the pre-winnowing test to see if the conflicting triplet will even be retained ends up being a bit
                     #faster in some cases here, although in cases where the total runtime is already short the overhead can make
@@ -431,10 +463,8 @@ def precomp_test_triplet_compatibility(label_set, triplets, conflict, precomp=No
                         print indent, 'COMP LEN 2 - PASS'
                     pass
                 else:
-                    #if > 2 labels in component, filter triplets to only 
-                    #include those in which both ingroups and outgroup 
-                    #are in the label set of the component, i.e. are in 
-                    #the clade of interest
+                    #if > 2 labels in component, filter triplets to only include those in which both ingroups and outgroup 
+                    #are in the label set of the component, i.e. are in the clade of interest
                    
                     #doing the pre-winnowing test to see if the conflicting triplet will even be retained ends up being a bit
                     #faster in some cases here, although in cases where the total runtime is already short the overhead can make
@@ -460,8 +490,8 @@ def precomp_test_triplet_compatibility(label_set, triplets, conflict, precomp=No
 
 
 def compute_comp_dict(label_set, triplets, comp_dict, verbose=False, level=1):
-    '''Precompute components for given label sets that can later be used as components to 
-    add conflicting triplets to during strict consensus calculations'''
+    '''Precompute components for given label sets that can later be used as components to add conflicting triplets to during 
+    strict consensus calculations'''
     
     if not triplets:
         return
@@ -595,6 +625,12 @@ def my_connected_components(connections, precomp=None):
     Note that the values may not be _ALL_ of the nodes to which the keys are connected.
     Each of the connections values are all of or part of a connected component.
     Return is a list of sets of connected componenets.
+
+    A precomputed (partial) set of connected components can be passed in, and any additional
+    connections are added to it.  A complication is that if the additional connections do 
+    alter the precomp connected components (by joining some), then the actual precomp list
+    would be changed.  So, in that case the precomp must be deepcopied and altered before
+    being returned.
     '''
 
     if precomp:
