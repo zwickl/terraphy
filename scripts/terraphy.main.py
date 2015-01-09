@@ -358,8 +358,14 @@ def test_triplet_compatibility(label_set, triplets, conflict, verbose=False, lev
                     #include those in which both ingroups and outgroup 
                     #are in the label set of the component, i.e. are in 
                     #the clade of interest
-                    new_trip = winnow_triplets(comp, triplets)
-                    if conflict & new_trip:
+                    
+                    #doing the pre-winnowing test to see if the conflicting triplet will even be retained ends up being a bit
+                    #faster in some cases here, although in cases where the total runtime is already short the overhead can make
+                    #it slightly slower
+                    #new_trip = winnow_triplets(comp, triplets)
+                    #if conflict & new_trip:
+                    if winnow_triplets(comp, conflict):
+                        new_trip = winnow_triplets(comp, triplets)
                         if verbose:
                             print indent, 'COMP LEN %d - WINNOW AND RECURSE' % len(comp)
                         test_triplet_compatibility(comp, new_trip, conflict, verbose=verbose, level=level+1)
@@ -429,8 +435,14 @@ def precomp_test_triplet_compatibility(label_set, triplets, conflict, precomp=No
                     #include those in which both ingroups and outgroup 
                     #are in the label set of the component, i.e. are in 
                     #the clade of interest
-                    new_trip = winnow_triplets(comp, triplets)
-                    if conflict & new_trip:
+                   
+                    #doing the pre-winnowing test to see if the conflicting triplet will even be retained ends up being a bit
+                    #faster in some cases here, although in cases where the total runtime is already short the overhead can make
+                    #it slightly slower
+                    #new_trip = winnow_triplets(comp, triplets)
+                    #if conflict & new_trip:
+                    if winnow_triplets(comp, conflict):
+                        new_trip = winnow_triplets(comp, triplets)
                         if verbose:
                             print indent, 'COMP LEN %d - WINNOW AND RECURSE' % len(comp)
                         
