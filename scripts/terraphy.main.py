@@ -183,12 +183,18 @@ def debug_output(label_set, triplets, components, level=0):
     print indent, '----'
 
 
-def build_or_strict_consensus(label_set, full_label_set, triplets, all_triplets, node, build, FR=None, verbose=False):
+def build_or_strict_consensus(label_set, full_label_set, triplets, all_triplets, node, build, precomp=None, verbose=False):
     '''This function constructs the BUILD tree for given triplets or the strict consensus.
     The algorithms are essentially the same, the strict consensus just does a lot of
     extra work to see if an edge occurs in all trees before adding it.
     '''
-
+    
+    if not build and not precomp:
+        #if doing a strict consensus, make a dictionary of precomputed connected componenets, indexed by frozensets of 
+        #label_sets. This will be used downstream in functions called by is_edge_in_all_trees
+        precomp = {}
+        compute_comp_dict(label_set, triplets, precomp)
+    
     if not triplets:
         #No triplets, so no internal branches within clade.  So, add polytomy of leaves
         for label in label_set:
@@ -219,7 +225,7 @@ def build_or_strict_consensus(label_set, full_label_set, triplets, all_triplets,
                     if verbose:
                         print '\tTO is_edge_in_all_trees - build_or_strict = 2'
                         debug_output(comp, triplets, None, 1)
-                    if build or is_edge_in_all_trees(comp, full_label_set, all_triplets, verbose=verbose):
+                    if build or is_edge_in_all_trees(comp, full_label_set, all_triplets, precomp=precomp, verbose=verbose):
                          if verbose:
                             print '\tNEW CHERRY'
                          new_node = node.add_child(Node())
@@ -237,7 +243,7 @@ def build_or_strict_consensus(label_set, full_label_set, triplets, all_triplets,
                     if verbose:
                         print '\tTO is_edge_in_all_trees - build_or_strict > 2'
                         debug_output(comp, triplets, None, 1)
-                    if build or is_edge_in_all_trees(comp, full_label_set, all_triplets, verbose=verbose):
+                    if build or is_edge_in_all_trees(comp, full_label_set, all_triplets, precomp=precomp, verbose=verbose):
                          if verbose:
                             print '\tNEW CLADE'
                          new_node = node.add_child(Node())
@@ -245,12 +251,12 @@ def build_or_strict_consensus(label_set, full_label_set, triplets, all_triplets,
                         if verbose:
                             print '\tREJECTED', comp
                         new_node = node
-                    build_or_strict_consensus(comp, full_label_set, new_trip, all_triplets, new_node, build, FR, verbose=verbose)
+                    build_or_strict_consensus(comp, full_label_set, new_trip, all_triplets, new_node, build, precomp=precomp, verbose=verbose)
         else:
             raise IncompatibleTripletException('Input is incompatible!')
 
 
-def is_edge_in_all_trees(in_components, label_set, triplets, verbose=False):
+def is_edge_in_all_trees(in_components, label_set, triplets, precomp=None, verbose=False):
     '''This is the heart of the Steel 1992 strict consensus algorithm.  To verify that an edge appears in all trees
     one needs to take the entire set of triplets, and iterate one by one over lots of other triplets that would conflict
     with the edge of interest.  The edge only appears in every tree if every one of those potentially conflicting triplets (PCTs)
@@ -290,7 +296,6 @@ def is_edge_in_all_trees(in_components, label_set, triplets, verbose=False):
         by frozensets of labels.
     '''
 
-
     out_components = set(label_set)
     out_components -= in_components
     in_components = set(in_components)
@@ -299,9 +304,10 @@ def is_edge_in_all_trees(in_components, label_set, triplets, verbose=False):
     #this is the old method, precomputing only the root components
     #precomp = compute(label_set, triplets)
     
-    #make a dictionary of precomputed connected componenets, indexed by frozensets of label_sets
-    precomp = {}
-    compute_comp_dict(label_set, triplets, precomp)
+    #if one wasn't passed in, make a dictionary of precomputed connected componenets, indexed by frozensets of label_sets
+    if not precomp:
+        precomp = {}
+        compute_comp_dict(label_set, triplets, precomp)
 
     for in_comp in in_components:
         for out_comp in out_components:
