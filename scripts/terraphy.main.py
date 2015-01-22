@@ -737,28 +737,24 @@ def print_subsets(infile):
     if not mat.character_subsets:
         sys.exit('no charsets found')
 
-    taxon_labels = mat.taxon_set.labels()
-    num_loci = len(mat.character_subsets.values())
-    sub_matrices = []
-    for val in mat.character_subsets.values():
-        sub_matrices.append(mat.export_character_subset(val))
-        
-    presence_absence = dict.fromkeys(taxon_labels)
+    char_subsets = mat.character_subsets.values()
+    
+    presence_absence = {}
 
-    for taxon in taxon_labels:
+    for taxon in mat.taxon_set:
         presence_absence[taxon] = []
-        for sub_mat in sub_matrices:
-            if re.search('[acgt]', str(sub_mat[taxon]).lower()):
-                presence_absence[taxon].append('1')
+        seq = mat.taxon_seq_map[taxon]
+
+        for subset_indeces in char_subsets:
+            for index in subset_indeces:
+                if str(seq[index]) in 'acgtACGT':
+                    presence_absence[taxon].append(True)
+                    break
             else:
-                presence_absence[taxon].append('0')
+                presence_absence[taxon].append(False)
 
-    #if options.verbose:
-    #    for taxon in taxon_labels:
-    #        print taxon, ''.join(presence_absence[taxon]), len([pa for pa in presence_absence[taxon] if pa == '1'])
-
-    for locus in range(num_loci):
-        print '\t'.join([tax for tax in presence_absence.keys() if presence_absence[tax][locus] == '1'])
+    for locus in range(len(char_subsets)):
+        print '\t'.join([re.sub(' ', '_', tax.label) for tax in presence_absence.iterkeys() if presence_absence[tax][locus]])
 
 
 def displayed_subtree(tree, labels, use_retain=False):
