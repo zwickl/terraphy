@@ -50,24 +50,42 @@ def find_triplets_defining_edges_descending_from_node(components):
     if isinstance(components, str) or len(components) == 1:
         return []
 
+    if len(components) > 2:
+        sys.stderr.write("WARNING: making triplets from a tree with polytomies!\n")
+
     toReturn = []
     for in_subtree in components:
         if len(in_subtree) > 1 and not isinstance(in_subtree, str):
             for out_subtree in components:
                 if out_subtree != in_subtree:
-                    gen = flattened_array_generator(in_subtree[0], sys.maxint)
-                    ingroup1 = next(gen)
-                    gen = flattened_array_generator(in_subtree[1], sys.maxint)
-                    ingroup2 = next(gen)
-                    gen = flattened_array_generator(out_subtree, sys.maxint)
-                    outgroup = next(gen)
-                    #ingroup1 = [f for f in flattened_array_generator(in_subtree[0], sys.maxint)][0]
-                    #ingroup2 = [f for f in flattened_array_generator(in_subtree[1], sys.maxint)][0]
-                    #outgroup = [f for f in flattened_array_generator(out_subtree, sys.maxint)][0]
-                    toReturn.append([ingroup1, ingroup2, outgroup])
+                    trip = []
+
+                    alpha_names = True
+                    if alpha_names:
+                        #Choose the alphabetically first taxon from each subtree - this will take a bit of extra
+                        #time to sort, but will allow the later identification and removal of triplets from different 
+                        #trees that define the same edge but would otherwise appear different due to different 
+                        #arbitrarily chosen taxa
+                        ingroup1 = sorted([ tax for tax in flattened_array_generator(in_subtree[0], sys.maxint) ])[0]
+                        ingroup2 = sorted([ tax for tax in flattened_array_generator(in_subtree[1], sys.maxint) ])[0]
+                        outgroup = sorted([ tax for tax in flattened_array_generator(out_subtree, sys.maxint) ])[0]
+                        trip = [ingroup1, ingroup2, outgroup]
+                        #the ordering of the ingroup taxa is also arbitrary, so make it alphabetical
+                        if ingroup1 > ingroup2:
+                            trip[0], trip[1] = trip[1], trip[0]
+                    else:
+                        for subtree in [in_subtree[0], in_subtree[1], out_subtree]:
+                            gen = flattened_array_generator(subtree, sys.maxint)
+                            trip.append(next(gen))
+                    
+
+                    toReturn.append(trip)
                     #break so that different triplets are not chosen that only differ by
                     #outgroup, in the case of polytomies
-                    break
+                    #NO, don't think that's right.  If for example there were a node with two leaf descendnents and one
+                    #clade, both leaves wouldn't be included in any triplet unless this loops multiple times and each
+                    #is included in a triplet as an outgroup.
+                    #break
 
     for comp in components:
         if len(comp) > 1 and not isinstance(comp, str):
