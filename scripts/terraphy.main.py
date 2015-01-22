@@ -965,7 +965,7 @@ preprocess.add_argument('-c', '--coverage', action='store_true', default=False, 
 
 preprocess.add_argument('-d', '--display', action='store_true', default=False, help='print the subtrees displayed by the input tree with the input subsets (requires --subset-file and --tree-files)')
 
-preprocess.add_argument('-t', '--triplets', action='store_true', default=False, help='Output arbitrary rooted taxon triples defining each edge in a set of treefiles (requires --tree-files')
+preprocess.add_argument('-t', '--triplets', action='store_true', default=False, help='Output arbitrary rooted taxon triples defining each edge in a set of treefiles (requires --tree-files)')
 
 analyses = parser.add_argument_group('Analyses to be performed on files created by preprocessing')
 
@@ -975,11 +975,11 @@ analyses.add_argument('-b', '--build', action='store_true', default=False, help=
 
 analyses.add_argument('-s', '--strict', action='store_true', default=False, help='compute a strict consensus tree from a triplet file (requires --triplet-file)')
 
-analyses.add_argument('--verbose', action='store_true', default=False, help='spit out extra information for debugging purposes')
-
 analyses.add_argument('-l', '--list-terraces', action='store_true', default=False, help='take a set of trees and assign them to terraces (requires --subset-file and --tree-files)')
 
 parser.add_argument('--profile', action='store_true', default=False, help='profile the given functionality')
+
+parser.add_argument('--verbose', action='store_true', default=False, help='spit out extra information for debugging purposes')
 
 writer = MultiWriter(sys.stdout.write)
 
@@ -987,7 +987,7 @@ writer = MultiWriter(sys.stdout.write)
 if len(sys.argv) == 1:
     try:
         from Tkinter import *
-        from pygot.tkinterutils import *
+        from tkarg.tkinterutils import *
         from ttk import *
     except ImportError:
         sys.stderr.write('%s\n' % parser.format_help())
@@ -996,6 +996,12 @@ if len(sys.argv) == 1:
 
     tk_root = Tk()
     tk_gui = ArgparseGui(parser, tk_root, width=1280, height=720, output_frame=True, destroy_when_done=False, graphics_window=True)
+
+    #indicate dependencies between options to the gui, which will cause the dependent options to be disabled (greyed out) until the
+    #dependency has been entered.  Options may have multiple dependencies.
+    tk_gui.register_dependencies({'--triplet-file':['--build', '--parents', '--strict'], 
+                                '--alignment-file':'--coverage', '--subset-file':['--display', '--list-terraces'],
+                                '--tree-files':['--display', '--triplets', '--list-terraces']})
 
     tk_root.mainloop()
     if tk_gui.cancelled:
