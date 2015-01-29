@@ -158,6 +158,17 @@ class CoverageMatrix(object):
                     self.rows[tax].append(1)
                 else:
                     self.rows[tax].append(0)
+
+    def loci_per_taxon(self):
+        if not self.rows:
+            self.fill_rows()
+
+        num_loci = len(self.columns)
+
+        counts = [0] * (num_loci + 1)
+        for row in self.rows.values():
+            counts[sum(row)] += 1
+        return counts
  
 
 class IncompatibleTripletException(Exception):
@@ -914,31 +925,96 @@ def num_trees(taxa):
     return trees
 
 
-def draw_matrix_graphic(sorted_taxa, matrix, canvas):
-    x_size = max(1, 1152 / len(matrix.rows))
-    y_size = 50 / len(matrix.columns)
-    x_loc, y_loc = 0, 0
-    vertical = False
-    if vertical:
+def draw_matrix_graphic(canvas, sorted_taxa, matrix, x_offset, y_offset, width, height):
+
+    loci_on_x = False
+
+    border_line_width = 2
+    width -= border_line_width * 2
+    height -= border_line_width * 2
+
+    if not loci_on_x:
+        num_x = len(matrix.rows)
+        num_y = len(matrix.columns)
+    else:
+        num_y = len(matrix.rows)
+        num_x = len(matrix.columns)
+
+    x_box_size = max(1, width  / num_x)
+    y_box_size = max(1, height / num_y)
+
+    max_ratio = 4
+    if x_box_size < y_box_size:
+        y_box_size = min(y_box_size, x_box_size * max_ratio)
+    else:
+        x_box_size = min(x_box_size, y_box_size * max_ratio)
+
+    actual_width = x_box_size * num_x + border_line_width * 2
+    actual_height = y_box_size * num_y + border_line_width * 2
+    
+    x0, y0 = x_offset + border_line_width, y_offset + border_line_width
+    x_loc, y_loc = x0, y0
+
+    canvas.create_rectangle(x_offset, y_offset, x_offset+actual_width+border_line_width, y_offset+actual_height+border_line_width, width=2)
+    
+    #vertical = False
+    #if vertical:
+    if loci_on_x:
         for tax, cov in matrix.rows.items():
             for cell in cov:
                 if cell == 1:
-                    canvas.create_rectangle(x_loc, y_loc, x_loc + x_size, y_loc + y_size, fill="blue", outline='blue')
+                    canvas.create_rectangle(x_loc, y_loc, x_loc + x_box_size, y_loc + y_box_size, fill="blue", outline='blue')
                 else:
-                    canvas.create_rectangle(x_loc, y_loc, x_loc + x_size, y_loc + y_size, fill='white', outline='white')
-                x_loc += x_size
-            y_loc += y_size
-            x_loc = 0
+                    canvas.create_rectangle(x_loc, y_loc, x_loc + x_box_size, y_loc + y_box_size, fill='white', outline='white')
+                x_loc += x_box_size
+            y_loc += y_box_size
+            x_loc = x0
     else:
         for cov in matrix.columns:
             for tax in sorted_taxa:
                 if tax in cov:
-                    canvas.create_rectangle(x_loc, y_loc, x_loc + x_size, y_loc + y_size, fill="blue", outline='blue')
+                    canvas.create_rectangle(x_loc, y_loc, x_loc + x_box_size, y_loc + y_box_size, fill="blue", outline='blue')
                 else:
-                    canvas.create_rectangle(x_loc, y_loc, x_loc + x_size, y_loc + y_size, fill='white', outline='white')
-                x_loc += x_size
-            y_loc += y_size
-            x_loc = 0
+                    canvas.create_rectangle(x_loc, y_loc, x_loc + x_box_size, y_loc + y_box_size, fill='white', outline='white')
+                x_loc += x_box_size
+            y_loc += y_box_size
+            x_loc = x0
+
+
+def draw_barplot(canvas, counts, x_offset, y_offset, width, height):
+
+    x_labels_height = 30
+    y_labels_width = 30
+    label_buffer = 5
+
+    max_y = max(counts)
+    y_size_per_count = (height - x_labels_height) / max_y
+    
+    num_bars = len(counts)
+    bar_spacing = 5
+    bar_width = (width - y_labels_width - (num_bars - 1) * bar_spacing) / num_bars
+
+    x0 = x_offset + y_labels_width
+    y0 = y_offset + height - x_labels_height
+
+    canvas.create_line(x0, y_offset, x0, y0, width=2)
+    canvas.create_line(x0, y0, x0 + width, y0, width=2)
+
+    ideal_y_labels = 5
+    if max_y < ideal_y_labels:
+        y_labels = range(max_y)
+    else:
+        y_labels = range(0, max_y, max_y / ideal_y_labels)
+    for lab in y_labels:
+        canvas.create_text(x0 - label_buffer, y0 - (lab * y_size_per_count), text=('%d' % lab), anchor='e') 
+
+    x_loc = x0
+    for num, count in enumerate(loci_per_taxon):
+        canvas.create_text(x_loc + bar_width / 2, y0 + label_buffer, text='%d' % num, anchor='n')
+        if count:
+            bar_height = count * y_size_per_count
+            canvas.create_rectangle(x_loc, y0, x_loc + bar_width, y0 - bar_height, fill="blue", outline='blue')
+        x_loc += bar_width + bar_spacing
 
 
 ########################################
@@ -991,13 +1067,16 @@ if len(sys.argv) == 1:
         sys.exit()
 
     tk_root = Tk()
-    tk_gui = ArgparseGui(parser, tk_root, width=1280, height=720, output_frame=True, destroy_when_done=False, graphics_window=True)
+    tk_gui = ArgparseGui(parser, tk_root, width=1280, height=720, output_frame=True, destroy_when_done=False)
 
     #indicate dependencies between options to the gui, which will cause the dependent options to be disabled (greyed out) until the
     #dependency has been entered.  Options may have multiple dependencies.
     tk_gui.register_dependencies({'--triplet-file':['--build', '--parents', '--strict'], 
                                 '--alignment-file':'--coverage', '--subset-file':['--display', '--list-terraces'],
                                 '--tree-files':['--display', '--triplets', '--list-terraces']})
+
+    #tk_gui.register_callback({'--subset-file': 
+
 
     tk_root.mainloop()
     if tk_gui.cancelled:
@@ -1032,6 +1111,9 @@ if options.triplet_file:
 #                    trip[0], trip[1] = trip[1], trip[0]
                 triplets.add(tuple(trip))
 
+#if tk_root:
+#    options.subset_file = 'subsets'
+
 if options.subset_file:
     with open(options.subset_file, 'rb') as subs:
         for line in subs:
@@ -1039,31 +1121,43 @@ if options.subset_file:
             #ignore blank lines
             if sub:
                 subsets.append(sub)
-
-    '''
+    
     mat = CoverageMatrix()
     mat.fill_from_subsets(subsets)
+    loci_per_taxon =  mat.loci_per_taxon()
 
     if tk_root:
-        draw_matrix_graphic(mat.taxa, mat, tk_gui.graphics_canvas)
+        can_width = 1024
+        can_height = 768
+        new_tk = Toplevel(tk_root)
+        new_tk.title('Coverage statistics')
+        new_can = Canvas(new_tk, width=can_width, height=can_height)
+        new_can.pack()
+
+        border = 5
+        draw_barplot(new_can, loci_per_taxon, border, border, (can_width / 2) - (border * 2), (can_height / 2) - (border * 2))
+
+        draw_matrix_graphic(new_can, mat.taxa, mat, border, border + (can_height / 2), can_width - (border * 2), (can_height / 2) - (border * 2))
+
         
         def sort_and_redraw():
             taxa = list(mat.taxa)
             def cells(tax):
                 return sum(mat.rows[tax])
             taxa.sort(key=cells, reverse=True)
-            draw_matrix_graphic(taxa, mat, tk_gui.graphics_canvas)
+            draw_matrix_graphic(new_can, taxa, mat, border, border + (can_height / 2), can_width - (border * 2), (can_height / 2) - (border * 2))
 
-        if hasattr(tk_gui, 'sort_button'):
-            tk_gui.sort_button.config(command=sort_and_redraw)
+        #tk_gui.add_buttons({'SORT':sort_and_redraw})
+        
+        button = Button(new_can, text='SORT', command=sort_and_redraw)
+        new_can.create_window((600, 5), window=button, height=button.winfo_reqheight(), width=button.winfo_reqwidth(), anchor='nw')
+        
         tk_root.mainloop()
 
     else:
         out_trans = ['-', 'X']
         for tax, cov in mat.rows.items():
             sys.stderr.write('%30s\t%s\n' % (tax, ''.join([out_trans[c] for c in cov])))
-    '''
-
 
 if options.tree_files:
     trees = dendropy_read_treefile(options.tree_files)
