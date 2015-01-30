@@ -121,6 +121,19 @@ class CoverageMatrix(object):
             self.taxa |= col
         self.fill_rows()
 
+    def fill_random(self, num_taxa, num_loci, coverage, func):
+
+        taxa = [ 't%d' % t for t in xrange(num_taxa) ]
+        self.taxa = set(taxa)
+        subsets = [ [] for _ in xrange(num_loci) ]
+
+        for x in xrange(num_loci):
+            for y in xrange(num_taxa):
+                #print func(x, y, coverage),
+                if random() < func(x, y, coverage):
+                    subsets[x].append(taxa[y])
+        self.fill_from_subsets(subsets)
+    
     def __getitem__(self, index):
         '''Pull information out of the coverage matrix, indexing taxa by name or number'''
         if isinstance(index, str):
@@ -191,6 +204,74 @@ class CoverageMatrix(object):
             self.reference_taxon = None
 
         return self.reference_taxon
+
+    def test_decisiveness(self):
+
+        #count = True
+        count = False
+
+        tlist = list(self.taxa)
+
+        if not self.find_reference_taxon():
+            print 'NOREF' 
+        else:
+            print 'REF' 
+        
+        num_tests = 0
+        found = 0
+        num_q_tests = 0
+        #this is equivalent to what itertools.combinations would do, but for some
+        #reason this is somewhat faster both under regular python and pypy
+        for n1, t1 in enumerate(tlist, 1):
+            for n2, t2 in enumerate(tlist[n1:], n1+1):
+                for n3, t3 in enumerate(tlist[n2:], n2+1):
+                    for n4, t4 in enumerate(tlist[n3:], n3+1):
+                        q = {t1, t2, t3, t4}
+                        num_q_tests += 1
+                        if num_q_tests % 10000 == 0:
+                            print '%g' % num_q_tests
+                        for col in self.columns:
+                            num_tests += 1
+                            if q.issubset(col):
+                                found += 1
+                                break
+                        else:
+                            if count:
+                                pass
+                            else:
+                                pass
+                                #print 'FAILED',
+                                #return False
+        print  ('Tests: %g' % num_tests, 'Qs: %g' % num_q_tests, 'QsFound: %g' % found, 'Prop: %g' % (float(found)/num_q_tests))
+        #return True
+        
+        num_tests = 0
+        found = 0
+        num_t_tests = 0
+        if self.find_reference_taxon():
+            tlist.remove(self.reference_taxon)
+        for n1, t1 in enumerate(tlist, 1):
+            for n2, t2 in enumerate(tlist[n1:], n1+1):
+                for n3, t3 in enumerate(tlist[n2:], n2+1):
+                    trip = {t1, t2, t3}
+                    num_t_tests += 1
+                    if num_t_tests % 10000 == 0:
+                        print '%g' % num_t_tests
+                    for col in self.columns:
+                        num_tests += 1
+                        if trip.issubset(col):
+                            found += 1
+                            break
+                    else:
+                        if count:
+                            pass
+                        else:
+                            #print 'FAILED',
+                            pass
+                            #return False
+        #print (True, '%g' % num_tests, '%g' % num_t_tests, '%g' % found, '%g' % (float(found)/num_t_tests))
+        print  ('Tests: %g' % num_tests, 'Ts: %g' % num_t_tests, 'TsFound: %g' % found, 'Prop: %g' % (float(found)/num_t_tests))
+        #return True
 
 
 class IncompatibleTripletException(Exception):
@@ -1133,8 +1214,8 @@ if options.triplet_file:
 #                    trip[0], trip[1] = trip[1], trip[0]
                 triplets.add(tuple(trip))
 
-if tk_root:
-    options.subset_file = 'subsets'
+#if tk_root:
+#    options.subset_file = 'subsets'
 
 if options.subset_file:
     with open(options.subset_file, 'rb') as subs:
@@ -1156,11 +1237,10 @@ if options.subset_file:
         new_can = Canvas(new_tk, width=can_width, height=can_height)
         new_can.pack()
 
-        border = 5
+        border = 10
         draw_barplot(new_can, loci_per_taxon, border, border, (can_width / 2) - (border * 2), (can_height / 2) - (border * 2))
 
         draw_matrix_graphic(new_can, mat.taxa, mat, border, border + (can_height / 2), can_width - (border * 2), (can_height / 2) - (border * 2))
-
         
         def sort_and_redraw():
             taxa = list(mat.taxa)
