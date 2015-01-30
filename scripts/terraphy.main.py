@@ -1030,11 +1030,15 @@ def num_trees(taxa):
 
 def draw_matrix_graphic(canvas, sorted_taxa, matrix, x_offset, y_offset, width, height):
 
+    x_labels_height = 50
+    y_labels_width = 50
+    label_buffer = 5
+    
     loci_on_x = False
 
     border_line_width = 2
-    width -= border_line_width * 2
-    height -= border_line_width * 2
+    width -= border_line_width * 2 + y_labels_width + label_buffer
+    height -= border_line_width * 2 + x_labels_height + label_buffer
 
     if not loci_on_x:
         num_x = len(matrix.rows)
@@ -1046,7 +1050,7 @@ def draw_matrix_graphic(canvas, sorted_taxa, matrix, x_offset, y_offset, width, 
     x_box_size = max(1, width  / num_x)
     y_box_size = max(1, height / num_y)
 
-    max_ratio = 4
+    max_ratio = 8
     if x_box_size < y_box_size:
         y_box_size = min(y_box_size, x_box_size * max_ratio)
     else:
@@ -1055,10 +1059,13 @@ def draw_matrix_graphic(canvas, sorted_taxa, matrix, x_offset, y_offset, width, 
     actual_width = x_box_size * num_x + border_line_width * 2
     actual_height = y_box_size * num_y + border_line_width * 2
     
-    x0, y0 = x_offset + border_line_width, y_offset + border_line_width
+    #x0, y0 = x_offset + border_line_width, y_offset + border_line_width
+    x_rect_offset = x_offset + y_labels_width + label_buffer
+    y_rect_offset = y_offset + x_labels_height + label_buffer
+    x0, y0 = x_offset + border_line_width + x_labels_height + label_buffer, y_offset + border_line_width + y_labels_width + label_buffer
     x_loc, y_loc = x0, y0
 
-    canvas.create_rectangle(x_offset, y_offset, x_offset+actual_width+border_line_width, y_offset+actual_height+border_line_width, width=2)
+    canvas.create_rectangle(x_rect_offset, y_rect_offset, x_rect_offset+actual_width+border_line_width, y_rect_offset+actual_height+border_line_width, width=2)
     
     #vertical = False
     #if vertical:
@@ -1073,7 +1080,20 @@ def draw_matrix_graphic(canvas, sorted_taxa, matrix, x_offset, y_offset, width, 
             y_loc += y_box_size
             x_loc = x0
     else:
-        for cov in matrix.columns:
+        #ylab = Label(x_offset, y_rect_offset + actual_height * 2, text='Loci', wraplength=1)
+        ylab = Label(canvas, text='Loci', wraplength=1)
+        canvas.create_window((x_offset, y_rect_offset + actual_height * 2), window=ylab, height=ylab.winfo_reqheight(), width=ylab.winfo_reqwidth(), anchor='e')
+        ideal_x_labels = 10
+        if num_x < ideal_x_labels:
+            x_labels = range(num_x)
+        else:
+            x_labels = range(1, num_x, num_x / ideal_x_labels)
+        for lab in x_labels:
+            canvas.create_text(x_rect_offset + x_box_size * lab, y_rect_offset - label_buffer, text=('%d' % lab), anchor='s') 
+
+        for num, cov in enumerate(matrix.columns, 1):
+            #canvas.create_text((x_rect_offset - label_buffer, y_rect_offset + x_box_size * num), text='%d' % num, anchor='e') 
+            canvas.create_text((x_rect_offset - label_buffer, y_loc + y_box_size / 2), text='%d' % num, anchor='e') 
             for tax in sorted_taxa:
                 if tax in cov:
                     canvas.create_rectangle(x_loc, y_loc, x_loc + x_box_size, y_loc + y_box_size, fill="blue", outline='blue')
@@ -1214,8 +1234,8 @@ if options.triplet_file:
 #                    trip[0], trip[1] = trip[1], trip[0]
                 triplets.add(tuple(trip))
 
-#if tk_root:
-#    options.subset_file = 'subsets'
+if tk_root:
+    options.subset_file = 'subsets'
 
 if options.subset_file:
     with open(options.subset_file, 'rb') as subs:
@@ -1237,7 +1257,7 @@ if options.subset_file:
         new_can = Canvas(new_tk, width=can_width, height=can_height)
         new_can.pack()
 
-        border = 10
+        border = 5
         draw_barplot(new_can, loci_per_taxon, border, border, (can_width / 2) - (border * 2), (can_height / 2) - (border * 2))
 
         draw_matrix_graphic(new_can, mat.taxa, mat, border, border + (can_height / 2), can_width - (border * 2), (can_height / 2) - (border * 2))
