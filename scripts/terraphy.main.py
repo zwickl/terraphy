@@ -5,7 +5,8 @@ import os
 import subprocess
 import shlex
 from argparse import ArgumentParser
-from itertools import izip
+from itertools import izip, combinations
+from random import sample, random
 from collections import Iterable
 from copy import deepcopy
 
@@ -110,6 +111,7 @@ class CoverageMatrix(object):
         self.taxa = set()
         self.rows = {}
         self.columns = []
+        self.reference_taxon = None
 
     def fill_from_subsets(self, subsets):
         '''Each subset is a list of taxa present for a given locus
@@ -159,6 +161,10 @@ class CoverageMatrix(object):
                 else:
                     self.rows[tax].append(0)
 
+    def print_subset_vectors(self):
+        for c in self.columns:
+            print ' '.join(c)
+
     def loci_per_taxon(self):
         if not self.rows:
             self.fill_rows()
@@ -170,6 +176,22 @@ class CoverageMatrix(object):
             counts[sum(row)] += 1
         return counts
  
+    def find_reference_taxon(self):
+        '''Choose an arbitrary taxon that has full coverage across loci, if
+        one exists.  Set the class member reference_taxon to the taxon label
+        and return it'''
+        if not self.rows:
+            self.fill_rows()
+
+        for taxon, coverage in self.rows.iteritems():
+            if sum(coverage) == len(self.columns):
+                self.reference_taxon = taxon
+                break
+        else:
+            self.reference_taxon = None
+
+        return self.reference_taxon
+
 
 class IncompatibleTripletException(Exception):
     '''An exception to allow escape from potentially deep recursion when looking for incompatible triplets'''
@@ -988,7 +1010,7 @@ def draw_barplot(canvas, counts, x_offset, y_offset, width, height):
     label_buffer = 5
 
     max_y = max(counts)
-    y_size_per_count = (height - x_labels_height) / max_y
+    y_size_per_count = (height - x_labels_height) / float(max_y)
     
     num_bars = len(counts)
     bar_spacing = 5
@@ -1111,8 +1133,8 @@ if options.triplet_file:
 #                    trip[0], trip[1] = trip[1], trip[0]
                 triplets.add(tuple(trip))
 
-#if tk_root:
-#    options.subset_file = 'subsets'
+if tk_root:
+    options.subset_file = 'subsets'
 
 if options.subset_file:
     with open(options.subset_file, 'rb') as subs:
@@ -1156,7 +1178,7 @@ if options.subset_file:
 
     else:
         out_trans = ['-', 'X']
-        for tax, cov in mat.rows.items():
+        for tax, cov in sorted(mat.rows.items()):
             sys.stderr.write('%30s\t%s\n' % (tax, ''.join([out_trans[c] for c in cov])))
 
 if options.tree_files:
