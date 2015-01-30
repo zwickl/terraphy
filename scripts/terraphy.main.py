@@ -14,6 +14,7 @@ import cProfile, pstats, StringIO
 
 sys.path.append("../")
 from terraphy.triplets import *
+from terraphy.coverage import *
 from terraphy.dendroutils import compat_get_taxon_set, compat_encode_bipartitions, dendropy_read_treefile
 
 #DENDROPY PACKAGE
@@ -100,178 +101,6 @@ def calculate_triplets(intrees):
         sys.stderr.write('after tree %d: %d triplets\n' % (tnum, len(triplets)))
     
     return (all_taxa, triplets)
-
-
-class CoverageMatrix(object):
-    '''A class to hold information on the pattern of missing data in a matrix.
-    '''
-    def __init__(self, rows=None):
-        '''Rows are the taxa, columns the loci.
-        '''
-        self.taxa = set()
-        self.rows = {}
-        self.columns = []
-        self.reference_taxon = None
-
-    def fill_from_subsets(self, subsets):
-        '''Each subset is a list of taxa present for a given locus
-        '''
-        self.columns = [set(col) for col in subsets]
-        for col in self.columns:
-            self.taxa |= col
-        self.fill_rows()
-
-    def fill_random(self, num_taxa, num_loci, coverage, func):
-
-        taxa = [ 't%d' % t for t in xrange(num_taxa) ]
-        self.taxa = set(taxa)
-        subsets = [ [] for _ in xrange(num_loci) ]
-
-        for x in xrange(num_loci):
-            for y in xrange(num_taxa):
-                #print func(x, y, coverage),
-                if random() < func(x, y, coverage):
-                    subsets[x].append(taxa[y])
-        self.fill_from_subsets(subsets)
-    
-    def __getitem__(self, index):
-        '''Pull information out of the coverage matrix, indexing taxa by name or number'''
-        if isinstance(index, str):
-            if not self.rows:
-                self.fill_rows()
-            if index in self.rows:
-                return self.rows[index]
-            else:
-                raise KeyError('Taxon %s not found in coverage matrix\n')
-        else:
-            assert(isinstance(index, int))
-            if not self.columns:
-                self.fill_columns()
-            if len(self.columns) < index:
-                return self.columns[index]
-
-    def fill_columns(self, recalculate=False):
-        '''Fill the column attribute from the rows'''
-        if self.columns and not recalculate:
-            sys.exit('columns already filled')
-        elif not self.rows:
-            sys.stderr.write('WARNING: filling matrix columns from empty matrix rows')
-        for sub_num in xrange(len(self.rows[0])):
-            self.columns.append([tax[sub_num] for tax in self.rows])
-
-    def fill_rows(self, recalculate=False):
-        '''Fill the rows from the columns'''
-        if self.rows and not recalculate:
-            sys.exit('taxa already filled')
-        elif not self.columns:
-            sys.stderr.write('WARNING: filling taxa from empty columns')
-        self.rows = { tax:[] for tax in self.taxa }
-        for col_num, col in enumerate(self.columns):
-            col_set = set(col)
-            for tax in self.taxa:
-                if tax in col_set:
-                    self.rows[tax].append(1)
-                else:
-                    self.rows[tax].append(0)
-
-    def print_subset_vectors(self):
-        for c in self.columns:
-            print ' '.join(c)
-
-    def loci_per_taxon(self):
-        if not self.rows:
-            self.fill_rows()
-
-        num_loci = len(self.columns)
-
-        counts = [0] * (num_loci + 1)
-        for row in self.rows.values():
-            counts[sum(row)] += 1
-        return counts
- 
-    def find_reference_taxon(self):
-        '''Choose an arbitrary taxon that has full coverage across loci, if
-        one exists.  Set the class member reference_taxon to the taxon label
-        and return it'''
-        if not self.rows:
-            self.fill_rows()
-
-        for taxon, coverage in self.rows.iteritems():
-            if sum(coverage) == len(self.columns):
-                self.reference_taxon = taxon
-                break
-        else:
-            self.reference_taxon = None
-
-        return self.reference_taxon
-
-    def test_decisiveness(self):
-
-        #count = True
-        count = False
-
-        tlist = list(self.taxa)
-
-        if not self.find_reference_taxon():
-            print 'NOREF' 
-        else:
-            print 'REF' 
-        
-        num_tests = 0
-        found = 0
-        num_q_tests = 0
-        #this is equivalent to what itertools.combinations would do, but for some
-        #reason this is somewhat faster both under regular python and pypy
-        for n1, t1 in enumerate(tlist, 1):
-            for n2, t2 in enumerate(tlist[n1:], n1+1):
-                for n3, t3 in enumerate(tlist[n2:], n2+1):
-                    for n4, t4 in enumerate(tlist[n3:], n3+1):
-                        q = {t1, t2, t3, t4}
-                        num_q_tests += 1
-                        if num_q_tests % 10000 == 0:
-                            print '%g' % num_q_tests
-                        for col in self.columns:
-                            num_tests += 1
-                            if q.issubset(col):
-                                found += 1
-                                break
-                        else:
-                            if count:
-                                pass
-                            else:
-                                pass
-                                #print 'FAILED',
-                                #return False
-        print  ('Tests: %g' % num_tests, 'Qs: %g' % num_q_tests, 'QsFound: %g' % found, 'Prop: %g' % (float(found)/num_q_tests))
-        #return True
-        
-        num_tests = 0
-        found = 0
-        num_t_tests = 0
-        if self.find_reference_taxon():
-            tlist.remove(self.reference_taxon)
-        for n1, t1 in enumerate(tlist, 1):
-            for n2, t2 in enumerate(tlist[n1:], n1+1):
-                for n3, t3 in enumerate(tlist[n2:], n2+1):
-                    trip = {t1, t2, t3}
-                    num_t_tests += 1
-                    if num_t_tests % 10000 == 0:
-                        print '%g' % num_t_tests
-                    for col in self.columns:
-                        num_tests += 1
-                        if trip.issubset(col):
-                            found += 1
-                            break
-                    else:
-                        if count:
-                            pass
-                        else:
-                            #print 'FAILED',
-                            pass
-                            #return False
-        #print (True, '%g' % num_tests, '%g' % num_t_tests, '%g' % found, '%g' % (float(found)/num_t_tests))
-        print  ('Tests: %g' % num_tests, 'Ts: %g' % num_t_tests, 'TsFound: %g' % found, 'Prop: %g' % (float(found)/num_t_tests))
-        #return True
 
 
 class IncompatibleTripletException(Exception):
@@ -1028,118 +857,6 @@ def num_trees(taxa):
     return trees
 
 
-def draw_matrix_graphic(canvas, sorted_taxa, matrix, x_offset, y_offset, width, height):
-
-    x_labels_height = 50
-    y_labels_width = 50
-    label_buffer = 5
-    
-    loci_on_x = False
-
-    border_line_width = 2
-    width -= border_line_width * 2 + y_labels_width + label_buffer
-    height -= border_line_width * 2 + x_labels_height + label_buffer
-
-    if not loci_on_x:
-        num_x = len(matrix.rows)
-        num_y = len(matrix.columns)
-    else:
-        num_y = len(matrix.rows)
-        num_x = len(matrix.columns)
-
-    x_box_size = max(1, width  / num_x)
-    y_box_size = max(1, height / num_y)
-
-    max_ratio = 8
-    if x_box_size < y_box_size:
-        y_box_size = min(y_box_size, x_box_size * max_ratio)
-    else:
-        x_box_size = min(x_box_size, y_box_size * max_ratio)
-
-    actual_width = x_box_size * num_x + border_line_width * 2
-    actual_height = y_box_size * num_y + border_line_width * 2
-    
-    #x0, y0 = x_offset + border_line_width, y_offset + border_line_width
-    x_rect_offset = x_offset + y_labels_width + label_buffer
-    y_rect_offset = y_offset + x_labels_height + label_buffer
-    x0, y0 = x_offset + border_line_width + x_labels_height + label_buffer, y_offset + border_line_width + y_labels_width + label_buffer
-    x_loc, y_loc = x0, y0
-
-    canvas.create_rectangle(x_rect_offset, y_rect_offset, x_rect_offset+actual_width+border_line_width, y_rect_offset+actual_height+border_line_width, width=2)
-    
-    #vertical = False
-    #if vertical:
-    if loci_on_x:
-        for tax, cov in matrix.rows.items():
-            for cell in cov:
-                if cell == 1:
-                    canvas.create_rectangle(x_loc, y_loc, x_loc + x_box_size, y_loc + y_box_size, fill="blue", outline='blue')
-                else:
-                    canvas.create_rectangle(x_loc, y_loc, x_loc + x_box_size, y_loc + y_box_size, fill='white', outline='white')
-                x_loc += x_box_size
-            y_loc += y_box_size
-            x_loc = x0
-    else:
-        #ylab = Label(x_offset, y_rect_offset + actual_height * 2, text='Loci', wraplength=1)
-        ylab = Label(canvas, text='Loci', wraplength=1)
-        canvas.create_window((x_offset, y_rect_offset + actual_height * 2), window=ylab, height=ylab.winfo_reqheight(), width=ylab.winfo_reqwidth(), anchor='e')
-        ideal_x_labels = 10
-        if num_x < ideal_x_labels:
-            x_labels = range(num_x)
-        else:
-            x_labels = range(1, num_x, num_x / ideal_x_labels)
-        for lab in x_labels:
-            canvas.create_text(x_rect_offset + x_box_size * lab, y_rect_offset - label_buffer, text=('%d' % lab), anchor='s') 
-
-        for num, cov in enumerate(matrix.columns, 1):
-            #canvas.create_text((x_rect_offset - label_buffer, y_rect_offset + x_box_size * num), text='%d' % num, anchor='e') 
-            canvas.create_text((x_rect_offset - label_buffer, y_loc + y_box_size / 2), text='%d' % num, anchor='e') 
-            for tax in sorted_taxa:
-                if tax in cov:
-                    canvas.create_rectangle(x_loc, y_loc, x_loc + x_box_size, y_loc + y_box_size, fill="blue", outline='blue')
-                else:
-                    canvas.create_rectangle(x_loc, y_loc, x_loc + x_box_size, y_loc + y_box_size, fill='white', outline='white')
-                x_loc += x_box_size
-            y_loc += y_box_size
-            x_loc = x0
-
-
-def draw_barplot(canvas, counts, x_offset, y_offset, width, height):
-
-    x_labels_height = 30
-    y_labels_width = 30
-    label_buffer = 5
-
-    max_y = max(counts)
-    y_size_per_count = (height - x_labels_height) / float(max_y)
-    
-    num_bars = len(counts)
-    bar_spacing = 5
-    bar_width = (width - y_labels_width - (num_bars - 1) * bar_spacing) / num_bars
-
-    x0 = x_offset + y_labels_width
-    y0 = y_offset + height - x_labels_height
-
-    canvas.create_line(x0, y_offset, x0, y0, width=2)
-    canvas.create_line(x0, y0, x0 + width, y0, width=2)
-
-    ideal_y_labels = 5
-    if max_y < ideal_y_labels:
-        y_labels = range(max_y)
-    else:
-        y_labels = range(0, max_y, max_y / ideal_y_labels)
-    for lab in y_labels:
-        canvas.create_text(x0 - label_buffer, y0 - (lab * y_size_per_count), text=('%d' % lab), anchor='e') 
-
-    x_loc = x0
-    for num, count in enumerate(loci_per_taxon):
-        canvas.create_text(x_loc + bar_width / 2, y0 + label_buffer, text='%d' % num, anchor='n')
-        if count:
-            bar_height = count * y_size_per_count
-            canvas.create_rectangle(x_loc, y0, x_loc + bar_width, y0 - bar_height, fill="blue", outline='blue')
-        x_loc += bar_width + bar_spacing
-
-
 ########################################
 
 parser = ArgumentParser(description='Perform various analyses related to phylogenetic terraces. Invoke script without arguments to start Tk GUI.')
@@ -1171,6 +888,8 @@ analyses.add_argument('-b', '--build', action='store_true', default=False, help=
 analyses.add_argument('-s', '--strict', action='store_true', default=False, help='compute a strict consensus tree from a triplet file (requires --triplet-file)')
 
 analyses.add_argument('-l', '--list-terraces', action='store_true', default=False, help='take a set of trees and assign them to terraces (requires --subset-file and --tree-files)')
+
+parser.add_argument('--simulate-coverage', type=float, default=None, help='simulate coverage matrices')
 
 parser.add_argument('--profile', action='store_true', default=False, help='profile the given functionality')
 
@@ -1234,10 +953,19 @@ if options.triplet_file:
 #                    trip[0], trip[1] = trip[1], trip[0]
                 triplets.add(tuple(trip))
 
-if tk_root:
-    options.subset_file = 'subsets'
+#if tk_root:
+#    options.subset_file = 'subsets'
+
+if options.simulate_coverage:
+    mat = CoverageMatrix()
+    #mat.fill_random(10, 30, 1.0, lambda x, y, c: c / (1.0 + sum([x,y])**0.), reference_taxon=True)
+    mat.fill_random(10, 30, options.simulate_coverage, lambda x, y, c: c, reference_taxon=True)
+    mat.print_subset_vectors()
+    profile_wrapper(mat.test_decisiveness, prof)
 
 if options.subset_file:
+    mat = CoverageMatrix()
+    
     with open(options.subset_file, 'rb') as subs:
         for line in subs:
             sub = line.strip().split()
@@ -1245,9 +973,21 @@ if options.subset_file:
             if sub:
                 subsets.append(sub)
     
-    mat = CoverageMatrix()
     mat.fill_from_subsets(subsets)
+
     loci_per_taxon =  mat.loci_per_taxon()
+    
+    #profile_wrapper(mat.test_decisiveness, prof)
+
+    '''
+    if prof:
+        s = StringIO.StringIO()
+        sortby = 'cumulative'
+        ps = pstats.Stats(prof, stream=s).sort_stats(sortby)
+        ps.print_stats()
+        ps.print_callers()
+        sys.stderr.write('%s\n' %s.getvalue())
+    '''
 
     if tk_root:
         can_width = 1024
@@ -1258,16 +998,16 @@ if options.subset_file:
         new_can.pack()
 
         border = 5
-        draw_barplot(new_can, loci_per_taxon, border, border, (can_width / 2) - (border * 2), (can_height / 2) - (border * 2))
+        mat.draw_barplot(new_can, loci_per_taxon, border, border, (can_width / 2) - (border * 2), (can_height / 2) - (border * 2))
 
-        draw_matrix_graphic(new_can, mat.taxa, mat, border, border + (can_height / 2), can_width - (border * 2), (can_height / 2) - (border * 2))
+        mat.draw_matrix_graphic(new_can, mat.taxa, border, border + (can_height / 2), can_width - (border * 2), (can_height / 2) - (border * 2))
         
         def sort_and_redraw():
             taxa = list(mat.taxa)
             def cells(tax):
-                return sum(mat.rows[tax])
+                return sum(mat.per_taxon_presence_absence[tax])
             taxa.sort(key=cells, reverse=True)
-            draw_matrix_graphic(new_can, taxa, mat, border, border + (can_height / 2), can_width - (border * 2), (can_height / 2) - (border * 2))
+            mat.draw_matrix_graphic(new_can, taxa, border, border + (can_height / 2), can_width - (border * 2), (can_height / 2) - (border * 2))
 
         #tk_gui.add_buttons({'SORT':sort_and_redraw})
         
@@ -1278,7 +1018,7 @@ if options.subset_file:
 
     else:
         out_trans = ['-', 'X']
-        for tax, cov in sorted(mat.rows.items()):
+        for tax, cov in sorted(mat.per_taxon_presence_absence.items()):
             sys.stderr.write('%30s\t%s\n' % (tax, ''.join([out_trans[c] for c in cov])))
 
 if options.tree_files:
