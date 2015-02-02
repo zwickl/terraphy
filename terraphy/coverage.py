@@ -24,7 +24,7 @@ class CoverageMatrix(object):
         self.per_locus_taxon_sets = [set(col) for col in subsets]
         for col in self.per_locus_taxon_sets:
             self.taxa |= col
-        self.fill_rows()
+        self.fill_taxa()
 
     def fill_random(self, num_taxa, num_loci, coverage, func, reference_taxon=False):
         '''Simulate a taxon coverage matrix by making the locus taxon sets
@@ -45,7 +45,7 @@ class CoverageMatrix(object):
         '''Pull information out of the coverage matrix, indexing taxa by name or number'''
         if isinstance(index, str):
             if not self.per_taxon_presence_absence:
-                self.fill_rows()
+                self.fill_taxa()
             if index in self.per_taxon_presence_absence:
                 return self.per_taxon_presence_absence[index]
             else:
@@ -53,11 +53,11 @@ class CoverageMatrix(object):
         else:
             assert(isinstance(index, int))
             if not self.per_locus_taxon_sets:
-                self.fill_columns()
+                self.fill_loci()
             if len(self.per_locus_taxon_sets) < index:
                 return self.per_locus_taxon_sets[index]
 
-    def fill_columns(self, recalculate=False):
+    def fill_loci(self, recalculate=False):
         '''Fill the column attribute from the rows'''
         if self.per_locus_taxon_sets and not recalculate:
             sys.exit('columns already filled')
@@ -66,7 +66,7 @@ class CoverageMatrix(object):
         for sub_num in xrange(len(self.per_taxon_presence_absence[0])):
             self.per_locus_taxon_sets.append([tax[sub_num] for tax in self.per_taxon_presence_absence])
 
-    def fill_rows(self, recalculate=False):
+    def fill_taxa(self, recalculate=False):
         '''Fill the rows from the columns'''
         if self.per_taxon_presence_absence and not recalculate:
             sys.exit('taxa already filled')
@@ -87,7 +87,7 @@ class CoverageMatrix(object):
 
     def loci_per_taxon(self):
         if not self.per_taxon_presence_absence:
-            self.fill_rows()
+            self.fill_taxa()
 
         num_loci = len(self.per_locus_taxon_sets)
 
@@ -101,7 +101,7 @@ class CoverageMatrix(object):
         one exists.  Set the class member reference_taxon to the taxon label
         and return it'''
         if not self.per_taxon_presence_absence:
-            self.fill_rows()
+            self.fill_taxa()
 
         for taxon, coverage in self.per_taxon_presence_absence.iteritems():
             if sum(coverage) == len(self.per_locus_taxon_sets):
@@ -181,17 +181,23 @@ class CoverageMatrix(object):
         #return True
 
     def draw_matrix_graphic(self, canvas, sorted_taxa, x_offset, y_offset, width, height):
+        '''Draw a checkerboard representation of matrix coverage onto a tkinter canvas
+        with the upper left corner being located at (x_offset, y_offset).
+        The default is to choose the smaller of taxa/loci to be the rows
+        So, this can transpose from the typical alignment view, which might be
+        a little confusing.
+        sorted_taxa can be used to reorder the rows, e.g. sorting by coverage density
+        '''
 
         x_labels_height = 50
         y_labels_width = 50
         label_buffer = 5
-        
-        loci_on_x = False
 
         border_line_width = 2
         width -= border_line_width * 2 + y_labels_width + label_buffer
         height -= border_line_width * 2 + x_labels_height + label_buffer
 
+        loci_on_x = True if (len(self.per_taxon_presence_absence) < len(self.per_locus_taxon_sets)) else False
         if not loci_on_x:
             num_x, num_y = len(self.per_taxon_presence_absence), len(self.per_locus_taxon_sets)
         else:
@@ -206,6 +212,7 @@ class CoverageMatrix(object):
         else:
             x_box_size = min(x_box_size, y_box_size * max_ratio)
 
+        #the amount of space actually used, due to rounding of box sizes
         actual_width = x_box_size * num_x + border_line_width * 2
         actual_height = y_box_size * num_y + border_line_width * 2
         
@@ -214,8 +221,33 @@ class CoverageMatrix(object):
         x0, y0 = x_offset + border_line_width + x_labels_height + label_buffer, y_offset + border_line_width + y_labels_width + label_buffer
         x_loc, y_loc = x0, y0
 
+        #rectangle around the checkerboard
         canvas.create_rectangle(x_rect_offset, y_rect_offset, x_rect_offset+actual_width+border_line_width, y_rect_offset+actual_height+border_line_width, width=2)
-        
+
+        #AXIS TITLES
+        xtext, ytext = ('Locus', 'Taxon') if loci_on_x else ('Taxon', 'Locus')
+        #using a Label for y axis to allow it to wrap in a single veritcal line, rotation is hard or not possible
+        ylab = Label(canvas, text=ytext, wraplength=1)
+        canvas.create_window((x_offset, y_rect_offset + actual_height / 2), window=ylab, height=ylab.winfo_reqheight(), width=ylab.winfo_reqwidth(), anchor='w')
+        canvas.create_text(x_rect_offset + actual_width / 2, y_rect_offset - label_buffer - x_labels_height / 2, text=xtext, anchor='s') 
+
+        #AXIS LABELS
+        ideal_x_labels, ideal_y_labels = 10, 10
+        if num_x < ideal_x_labels:
+            x_labels = range(1, num_x+1)
+        else:
+            x_labels = range(1, num_x+1, num_x / ideal_x_labels)
+        for lab in x_labels:
+            canvas.create_text(x0 + x_box_size / 2 + x_box_size * (lab - 1), y_rect_offset - label_buffer, text=('%d' % lab), anchor='s') 
+       
+        if num_y < ideal_y_labels:
+            y_labels = range(1, num_y+1)
+        else:
+            y_labels = range(1, num_y+1, num_y / ideal_y_labels)
+        for lab in y_labels:
+            canvas.create_text((x_rect_offset - label_buffer, y0 + y_box_size / 2 + y_box_size * (lab - 1)), text='%d' % lab, anchor='e') 
+
+        #now the checkerboard
         if loci_on_x:
             for tax, cov in self.per_taxon_presence_absence.items():
                 for cell in cov:
@@ -227,26 +259,7 @@ class CoverageMatrix(object):
                 y_loc += y_box_size
                 x_loc = x0
         else:
-            ideal_x_labels = 10
-            if num_x < ideal_x_labels:
-                x_labels = range(1, num_x+1)
-            else:
-                x_labels = range(1, num_x+1, num_x / ideal_x_labels)
-            for lab in x_labels:
-                canvas.create_text(x_rect_offset + x_box_size / 2 + x_box_size * (lab - 1), y_rect_offset - label_buffer, text=('%d' % lab), anchor='s') 
-           
-            #using a Label for this to allow it to wrap in a single veritcal line, rotation is hard or not possible
-            ylab = Label(canvas, text='Locus', wraplength=1)
-            canvas.create_window((x_offset, y_rect_offset + actual_height / 2), window=ylab, height=ylab.winfo_reqheight(), width=ylab.winfo_reqwidth(), anchor='w')
-            ideal_y_labels = 10
-            if num_y < ideal_y_labels:
-                y_labels = range(1, num_y+1)
-            else:
-                y_labels = range(1, num_y+1, num_y / ideal_y_labels)
-
             for num, cov in enumerate(self.per_locus_taxon_sets, 1):
-                if num in y_labels:
-                    canvas.create_text((x_rect_offset - label_buffer, y_loc + y_box_size / 2), text='%d' % num, anchor='e') 
                 for tax in sorted_taxa:
                     if tax in cov:
                         canvas.create_rectangle(x_loc, y_loc, x_loc + x_box_size, y_loc + y_box_size, fill="blue", outline='blue')
