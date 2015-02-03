@@ -81,6 +81,16 @@ class CoverageMatrix(object):
                 else:
                     self.per_taxon_presence_absence[tax].append(0)
 
+    def calculate_statistics(self):
+        if not self.per_taxon_presence_absence:
+            self.fill_taxa()
+        if not self.per_locus_taxon_sets:
+            self.fill_loci()
+        self.num_matrix_cells = len(self.per_taxon_presence_absence) * len(self.per_locus_taxon_sets)
+        self.filled_matrix_cells = sum([sum(row) for row in self.per_taxon_presence_absence.values()])
+        self.coverage_proportion =float(self.filled_matrix_cells) / self.num_matrix_cells
+        print self.num_matrix_cells, self.filled_matrix_cells, self.coverage_proportion
+
     def print_subset_vectors(self):
         for c in self.per_locus_taxon_sets:
             print ' '.join(c)
@@ -269,37 +279,44 @@ class CoverageMatrix(object):
                 y_loc += y_box_size
                 x_loc = x0
 
-
     def draw_barplot(self, canvas, counts, x_offset, y_offset, width, height):
         '''Draw a barplot of something like loci-per-taxon. This actually just plots the passed
-        in count list, and doesn't use any of the class data
+       in count list, and doesn't use any of the class data
         '''
 
-        x_labels_height = 30
-        y_labels_width = 30
-        label_buffer = 5
+        x_labels_height = 40
+        y_labels_width = 40
+        plot_buffer = 7
 
         max_x = len(counts) - 1
         max_y = max(counts)
-        y_size_per_count = (height - x_labels_height) / float(max_y)
+        y_size_per_count = (height - x_labels_height - plot_buffer) / float(max_y)
         
         num_bars = len(counts)
         bar_spacing = 5
-        bar_width = (width - y_labels_width - (num_bars - 1) * bar_spacing) / num_bars
+        bar_width = (width - plot_buffer - y_labels_width - (num_bars - 1) * bar_spacing) / num_bars
 
         x0 = x_offset + y_labels_width
         y0 = y_offset + height - x_labels_height
 
         canvas.create_line(x0, y_offset, x0, y0, width=2)
         canvas.create_line(x0, y0, x0 + width, y0, width=2)
-
+        
+        #AXIS LABELS
+        #using a Label for y axis to allow it to wrap in a single veritcal line, rotation is hard or not possible
+        ylab = Label(canvas, text='Frequency', wraplength=1)
+        canvas.create_window((x_offset, height / 2), window=ylab, height=ylab.winfo_reqheight(), width=ylab.winfo_reqwidth(), anchor='w')
+        canvas.create_text(x_offset + y_labels_width + (width - y_labels_width) / 2, y_offset + height - plot_buffer, text='Number of loci', anchor='c') 
+        
         ideal_y_labels = 5
         if max_y < ideal_y_labels:
             y_labels = range(max_y+1)
         else:
             y_labels = range(0, max_y+1, max_y / ideal_y_labels)
         for lab in y_labels:
-            canvas.create_text(x0 - label_buffer, y0 - (lab * y_size_per_count), text=('%d' % lab), anchor='e') 
+            canvas.create_text(x0 - plot_buffer, y0 - (lab * y_size_per_count), text=('%d' % lab), anchor='e') 
+
+        print x0 - plot_buffer, y0 - (lab * y_size_per_count)
 
         ideal_x_labels = 10
         if max_x < ideal_x_labels:
@@ -310,10 +327,15 @@ class CoverageMatrix(object):
         x_loc = x0
         for num, count in enumerate(counts):
             if num in x_labels:
-                canvas.create_text(x_loc + bar_width / 2, y0 + label_buffer, text='%d' % num, anchor='n')
+                canvas.create_text(x_loc + bar_width / 2, y0 + plot_buffer, text='%d' % num, anchor='n')
             if count:
                 bar_height = count * y_size_per_count
                 canvas.create_rectangle(x_loc, y0, x_loc + bar_width, y0 - bar_height, fill="blue", outline='blue')
             x_loc += bar_width + bar_spacing
+
+    #def print_statistics(self, canvas, x_offset, y_offset, width_height):
+    #    self.calculate_statistics()
+
+
 
 
