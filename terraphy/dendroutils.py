@@ -7,9 +7,9 @@ try:
     
     #for dendropy 4 compatability
     try:
-        from dendropy.error import DataError
+        from dendropy.error import DataError as DataParseError
     except:
-        from dendropy.utility.error import DataError
+        from dendropy.utility.error import DataParseError
     
     #this deals with changes in DendroPy 4
     try:
@@ -46,7 +46,7 @@ def dendropy_read_treefile(treefiles, quiet=False, **kwargs):
         #try two input formats
         try:
             intrees.extend(TreeList.get_from_string(trees, "nexus", case_sensitive_taxon_labels=True, preserve_underscores=True, **kwargs))
-        except DataError:
+        except DataParseError:
             intrees.extend(TreeList.get_from_string(trees, "newick", case_sensitive_taxon_labels=True, preserve_underscores=True, **kwargs))
     else:
         for tf in treefiles:
@@ -55,7 +55,7 @@ def dendropy_read_treefile(treefiles, quiet=False, **kwargs):
                 if not quiet:
                     sys.stderr.write('Reading file %s in newick format ...\n' % tf)
                 intrees.extend(TreeList.get_from_path(tf, "newick", case_sensitive_taxon_labels=True, preserve_underscores=True, **kwargs))
-            except DataError:
+            except DataParseError:
                 if not quiet:
                     sys.stderr.write('Reading file %s in nexus format ...\n' % tf)
                 intrees.extend(TreeList.get_from_path(tf, "nexus", case_sensitive_taxon_labels=True, preserve_underscores=True, **kwargs))

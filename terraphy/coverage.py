@@ -40,6 +40,44 @@ class CoverageMatrix(object):
                 if (reference_taxon and y == 0) or (random() < func(x, y, coverage)):
                     subsets[x].append(taxa[y])
         self.fill_from_subsets(subsets)
+ 
+    def fill_random_locus_func(self, num_taxa, num_loci, func, min_coverage=0.0, max_coverage=1.0, reference_taxon=False):
+        '''Simulate a taxon coverage matrix by making the locus taxon sets
+        '''
+        taxa = [ 't%d' % t for t in xrange(num_taxa) ]
+        self.taxa = set(taxa)
+        subsets = [ [] for _ in xrange(num_loci) ]
+
+        for x in xrange(num_loci):
+            coverage = -1.0
+            while coverage < min_coverage or coverage > max_coverage:
+                coverage = func()
+            for y in xrange(num_taxa):
+                #print func(x, y, coverage),
+                if (reference_taxon and y == 0) or (random() < coverage):
+                    subsets[x].append(taxa[y])
+        self.fill_from_subsets(subsets)
+ 
+    def fill_random_taxon_func(self, num_taxa, num_loci, func, min_coverage=0.0, max_coverage=1.0, reference_taxon=False):
+        '''Simulate a taxon coverage matrix by making the locus taxon sets
+        '''
+        taxa = [ 't%d' % t for t in xrange(num_taxa) ]
+        self.taxa = set(taxa)
+        subsets = [ [] for _ in xrange(num_loci) ]
+        
+        cov_list = []
+        for _ in taxa:
+            while coverage < min_coverage or coverage > max_coverage:
+                coverage = func()
+            cov_list.append(coverage)
+       
+        print cov_list, sum(cov_list) / float(num_taxa)
+
+        for x in xrange(num_loci):
+            for y in xrange(num_taxa):
+                if (reference_taxon and y == 0) or (random() < cov_list[y]):
+                    subsets[x].append(taxa[y])
+        self.fill_from_subsets(subsets)
     
     def __getitem__(self, index):
         '''Pull information out of the coverage matrix, indexing taxa by name or number'''
@@ -89,7 +127,7 @@ class CoverageMatrix(object):
         self.num_matrix_cells = len(self.per_taxon_presence_absence) * len(self.per_locus_taxon_sets)
         self.filled_matrix_cells = sum([sum(row) for row in self.per_taxon_presence_absence.values()])
         self.coverage_proportion =float(self.filled_matrix_cells) / self.num_matrix_cells
-        print self.num_matrix_cells, self.filled_matrix_cells, self.coverage_proportion
+        #print self.num_matrix_cells, self.filled_matrix_cells, self.coverage_proportion
 
     def print_subset_vectors(self):
         for c in self.per_locus_taxon_sets:
@@ -259,7 +297,9 @@ class CoverageMatrix(object):
 
         #now the checkerboard
         if loci_on_x:
-            for tax, cov in self.per_taxon_presence_absence.items():
+            #for tax, cov in self.per_taxon_presence_absence.items():
+            for tax in sorted_taxa:
+                cov = self.per_taxon_presence_absence[tax]
                 for cell in cov:
                     if cell == 1:
                         canvas.create_rectangle(x_loc, y_loc, x_loc + x_box_size, y_loc + y_box_size, fill="blue", outline='blue')
