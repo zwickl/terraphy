@@ -20,8 +20,8 @@ from terraphy.dendroutils import compat_get_taxon_set, compat_encode_bipartition
 
 #DENDROPY PACKAGE
 try:
-    from dendropy import TreeList, Tree, Node, DataSet, TaxonSet
-    from dendropy.treecalc import symmetric_difference
+    from dendropy import TreeList, Tree, Node, DataSet, Taxon, TaxonSet
+    #from dendropy.treecalc import symmetric_difference
     
     #for dendropy 4 compatability
     try:
@@ -29,9 +29,19 @@ try:
     except:
         from dendropy.utility.error import DataError
 
+    try:
+        from dendropy.treesim import uniform_pure_birth
+    except:
+        from dendropy.simulate.treesim import uniform_pure_birth_tree as uniform_pure_birth
+    
+    #this deals with changes in DendroPy 4
+    try:
+        from dendropy.calculate import treesplit
+    except ImportError:
+        from dendropy import treesplit
 
-except ImportError:
-    sys.exit('problem importing dendropy package - it is required')
+except ImportError as e:
+    sys.exit('%s\nproblem importing dendropy package - it is required' % e)
 
 
 #PYGRAPH PACKAGE
@@ -137,6 +147,7 @@ def calculate_triplets(out, intrees, messages=sys.stderr):
 def read_triplet_file(triplet_file, messages=sys.stderr):
     triplets = set()
     labels = []
+    messages.write('Reading triplets from file... ')
     with open(triplet_file, 'rb') as intrips:
         #first line is a list of all labels, all following lines are triples of taxa
         for line in intrips:
@@ -149,6 +160,7 @@ def read_triplet_file(triplet_file, messages=sys.stderr):
 #                if trip[1] < trip[0]:
 #                    trip[0], trip[1] = trip[1], trip[0]
                 triplets.add(tuple(trip))
+    messages.write('done.\n')
     return (labels, triplets)
 
 
@@ -177,7 +189,8 @@ def debug_output(label_set, triplets, components, level=0):
 
 def make_build_tree(out, triplet_file, messages=sys.stderr, verbose=False):
     tree = Tree()
-   
+    
+    messages.write('Computing BUILD consensus tree...\n')
     label_set, triplets = read_triplet_file(triplet_file, messages=messages)
     
     build_or_strict_consensus(label_set, set(label_set), triplets, triplets, tree.seed_node, build=True, verbose=verbose)
@@ -189,6 +202,7 @@ def make_build_tree(out, triplet_file, messages=sys.stderr, verbose=False):
         else:
             out.write('%s;\n' % tree)
     
+    messages.write('Done with BUILD consensus tree.\n')
     #this is the legacy behavior, returning instead of writing in the func
     return tree
 
@@ -196,6 +210,7 @@ def make_build_tree(out, triplet_file, messages=sys.stderr, verbose=False):
 def make_strict_tree(out, triplet_file, messages=sys.stderr, verbose=False):
     tree = Tree()
     
+    messages.write('Computing strict consensus tree (this can take some time)...\n')
     label_set, triplets = read_triplet_file(triplet_file, messages=messages)
     
     build_or_strict_consensus(label_set, set(label_set), triplets, triplets, tree.seed_node, build=False, verbose=verbose)
@@ -207,6 +222,7 @@ def make_strict_tree(out, triplet_file, messages=sys.stderr, verbose=False):
         else:
             out.write('%s;\n' % tree)
     
+    messages.write('Done with strict consensus tree.\n')
     #this is the legacy behavior, returning instead of writing in the func
     return tree
 
@@ -564,7 +580,8 @@ def compute_comp_dict(label_set, triplets, comp_dict, verbose=False, level=1):
 def count_trees_on_terrace(out, triplet_file, messages=sys.stderr):
     label_set, triplets = read_triplet_file(triplet_file, messages=messages)
 
-    num_par = superb(label_set, triplets, 0)
+    messages.write('Calculating parent trees on terrace...\n')
+    num_par = superb(label_set, triplets)
 
     if out:
         if isinstance(out, str):
@@ -576,7 +593,7 @@ def count_trees_on_terrace(out, triplet_file, messages=sys.stderr):
     return num_par
 
 
-def superb(label_set, triplets, num_parents):
+def superb(label_set, triplets):
     '''SUPERB algorithm of Constantinescu and Sankoff, 1995, to count number of parent trees
     compatible with given set of triplets'''
     num_parents = 0
@@ -595,13 +612,13 @@ def superb(label_set, triplets, num_parents):
                     q = 1
                 else:
                     new_triplets = winnow_triplets(subset1, triplets)
-                    q = superb(subset1, new_triplets, num_parents)
+                    q = superb(subset1, new_triplets)
 
                 if len(subset2) <= 2:
                     v = 1
                 else:
                     new_triplets = winnow_triplets(subset2, triplets)
-                    v = superb(subset2, new_triplets, num_parents)
+                    v = superb(subset2, new_triplets)
 
                 num_parents += q * v
 
@@ -611,7 +628,7 @@ def superb(label_set, triplets, num_parents):
     return num_parents
 
 
-def create_bipartition(components, nth):
+def create_bipartition(components, nth, as_list=False):
     '''Take the components in the existing partition and divide them into two groups, 
     creating a biparition.  nth is an index that arbitarily generates one of the possible 
     groupings of the partition components into a bipartition, specifying by converting the 
@@ -627,6 +644,8 @@ def create_bipartition(components, nth):
         pattern = '0' * (num_components - len(pattern)) + bin(nth)[2:]
     subsets = (set( e for e in flattened_array_generator([components[el] for el in xrange(num_components) if pattern[el] == "0"])),
             set(e for e in flattened_array_generator([components[el] for el in xrange(num_components) if pattern[el] == "1"])))
+    if as_list:
+        subsets = (list(subsets[0]), list(subsets[1]))
     return subsets
 
 
@@ -847,7 +866,9 @@ def displayed_subtree(tree, labels, use_retain=False):
         else:
             newtree.prune_taxa(labels)
 
-    compat_encode_bipartitions(newtree, delete_outdegree_one=False)
+    #not sure why I had delete_outdegree_one here, but doesn't work with DP4
+    #compat_encode_bipartitions(newtree, delete_outdegree_one=False)
+    compat_encode_bipartitions(newtree)
     return newtree
 
 
@@ -927,13 +948,29 @@ def same_tree(reference_tree, test_tree):
     return True
 
 
-def assign_to_terraces(trees, subsets):
+def assign_to_terraces(out, treefiles, subset_file, messages=sys.stderr):
     '''This is deprecated in favor of assign_to_terraces_using_hashes.'''
+    
+    messages.write('Assigning trees to terraces...\n')
+ 
+    if isinstance(treefiles, str):
+        trees = dendropy_read_treefile([treefiles], writer=messages)
+    elif isinstance(treefiles[0], str):
+        trees = dendropy_read_treefile(treefiles, writer=messages)
+   
+    subsets = read_subset_file(subset_file)
+    
     #the first tree has to be its own terrace
     this_tree_subtrees = TreeList( [displayed_subtree(trees[0], subset) for subset in subsets] )
     terrace_subtree_list = [this_tree_subtrees]
     terrace_size = {0:1}
-    
+   
+    if out:
+        if isinstance(out, str):
+            out_stream = open(out, 'w')
+        else:
+            out_stream = out
+
     #assign this same TaxonSet to all of the TreeLists created, otherwise bad things happen when trying to compare taxa and splits
     global_taxon_set = compat_get_taxon_set(this_tree_subtrees)
     
@@ -949,28 +986,44 @@ def assign_to_terraces(trees, subsets):
                     break
             #if all subtrees matched, terrace is same
             if terrace_match:
-                print 'tree %d is on terrace %d' % (tree_num, terrace_num)
+                out_stream.write('tree %d is on terrace %d\n' % (tree_num, terrace_num))
                 terrace_size[terrace_num] += 1
                 break
         else:
             #get here if went through all terraces with no match
-            print 'tree %d is on a new terrace' % tree_num
+            out_stream.write('tree %d is on a new terrace\n' % tree_num)
             terrace_size[len(terrace_subtree_list)] = 1
             terrace_subtree_list.append(this_tree_subtrees)
 
-    print terrace_size
+    messages.write(' done.')
+    out_stream.write('%d terraces found' % len(terrace_size))
 
 
-def assign_to_terraces_using_hashes(trees, subsets):
+def assign_to_terraces_using_hashes(out, treefiles, subset_file, messages=sys.stderr):
     '''This is to be favored over assign_to_terraces.  The speed is about the same (somewhat surprisingly ...
     must be that the pruning function in displayed_subtree dominates the runtime), but since it 
     isn't actually storing any trees the memory usage doesn't grow as more terraces are found.
     '''
-    #the first tree has to be its own terrace
-    #this_tree_subtrees = TreeList( [displayed_subtree(trees[0], subset) for subset in subsets] )
+    messages.write('Assigning trees to terraces...\n')
+    
+    if isinstance(treefiles, str):
+        trees = dendropy_read_treefile([treefiles], writer=messages)
+    elif isinstance(trees[0], str):
+        trees = dendropy_read_treefile(treefiles, writer=messages)
+   
     for tree in trees:
         compat_encode_bipartitions(tree)
 
+    subsets = read_subset_file(subset_file)
+    
+    if out:
+        if isinstance(out, str):
+            out_stream = open(out, 'w')
+        else:
+            out_stream = out
+ 
+    #the first tree has to be its own terrace
+    #this_tree_subtrees = TreeList( [displayed_subtree(trees[0], subset) for subset in subsets] )
     this_tree_subtrees = [ sum([ hash(n.edge.split_bitmask) for n in displayed_subtree(trees[0], subset).internal_nodes() ]) for subset in subsets]
     terrace_subtree_list = [this_tree_subtrees]
     terrace_size = {0:1}
@@ -981,16 +1034,17 @@ def assign_to_terraces_using_hashes(trees, subsets):
         for terrace_num, terrace_subtrees in enumerate(terrace_subtree_list):
             #if all subtrees matched, terrace is same
             if terrace_subtrees == this_tree_subtrees:
-                print 'tree %d is on terrace %d' % (tree_num, terrace_num)
+                out_stream.write('tree %d is on terrace %d\n' % (tree_num, terrace_num))
                 terrace_size[terrace_num] += 1
                 break
         else:
             #get here if went through all terraces with no match
-            print 'tree %d is on a new terrace' % tree_num
+            out_stream.write('tree %d is on a new terrace\n' % tree_num)
             terrace_size[len(terrace_subtree_list)] = 1
             terrace_subtree_list.append(this_tree_subtrees)
 
-    print terrace_size
+    messages.write(' done.')
+    out_stream.write('%d terraces found' % len(terrace_size))
 
 
 def num_trees(taxa):
@@ -1033,9 +1087,9 @@ in_group = parser.add_argument_group('Input Files')
 
 in_group.add_argument('--alignment-file', default=None, help='nexus alignment including charsets to be used to determine character partition')
 
-in_group.add_argument('--parent-tree-file', default=None, help='single parent tree to be analyzed')
+in_group.add_argument('--parent-tree-file', default=None, help='single parent tree to be analyzed (nexus or newick)')
 
-#in_group.add_argument('--tree-files', nargs="*", default=None, help='nexus or newick tree file(s)')
+in_group.add_argument('--treefiles-to-assign', nargs="*", default=None, help='trees to be assigned to one or more terraces (nexus or newick)')
 
 in_group.add_argument('--subset-file', default=None, help='file with lines indicating sets of taxa represented in various partition subsets (created by --coverage preprocessing option)')
 
@@ -1084,16 +1138,22 @@ if len(sys.argv) == 1:
         stderr_writer.write('%s\n' % parser.format_help())
         stderr_writer.write('\nUnable to import GUI componenets.  Use command line options.\n\n'.upper())
         sys.exit()
+    
+    preprocess.GUI_IGNORE = True
 
     tk_root = Tk()
     tk_gui = ArgparseGui(parser, tk_root, width=1200, height=720, destroy_when_done=False, progress_bar=False)
 
     #indicate dependencies between options to the gui, which will cause the dependent options to be disabled (greyed out) until the
     #dependency has been entered.  Options may have multiple dependencies.
-    tk_gui.register_dependencies({'--triplet-file':['--build', '--parents', '--strict'], 
-                                '--alignment-file':'--coverage', '--subset-file':['--display', '--list-terraces'],
-                                '--parent-tree-file':['--display', '--triplets', '--list-terraces']})
     
+    tk_gui.register_dependencies({'--triplet-file':['--build', '--parents', '--strict'], 
+                                '--alignment-file':'--coverage', 
+                                '--subset-file':['--display', '--list-terraces'],
+                                '--parent-tree-file':'--display', 
+                                '--treefiles-to-assign':'--list-terraces'})
+    
+
     stderr_writer.add_streams(tk_gui.write_to_status)
    
     opt = tk_gui.get_option('--subset-file')
@@ -1111,10 +1171,11 @@ if len(sys.argv) == 1:
    
     if tk_gui.cancelled:
         sys.exit('cancelled ...')
-    
+   
     #make the command line list generated by the gui that will be parsed by argparse exactly as if it were
     #typed on the command line
     options = parser.parse_args(tk_gui.make_commandline_list())
+    prof = cProfile.Profile() if options.profile else None
     
     #set up a window to hold various result output
     results_window = ResultsWindow(tk_root, 300, 20)
@@ -1128,43 +1189,46 @@ else:
     tk_root = None
     options = parser.parse_args()
 
-labels = []
-triplets = set()
-subsets = []
-parent_tree = None
-subtrees = None
+    prof = cProfile.Profile() if options.profile else None
+    #these pre-processing steps are done differently with the GUI
+    if options.coverage:
+        if not options.alignment_file:
+            sys.exit('alignment file (-a) must be supplied to determine taxon coverage')
+        profile_wrapper(print_subsets, prof, stdout_writer, options.alignment_file, messages=stderr_writer)
 
-prof = cProfile.Profile() if options.profile else None
+    if options.display:
+        if not options.subset_file and options.parent_tree_file:
+            sys.exit('must specify both subset file (-s) and tree file (--tree-files) to print displayed subtrees')
+        profile_wrapper(print_displayed_subtrees, prof, stdout_writer, options.parent_tree_file, options.subset_file, messages=stderr_writer)
+
+    if options.triplets:
+        if not options.subtree_file:
+            sys.exit('subtree file (--subtree-file) must be specified to calculate triplets')
+        profile_wrapper(calculate_triplets, prof, stdout_writer, options.subtree_file, stderr_writer)
 
 #for debugging, so gui doesn't actually need to be manipulated
 if tk_root:
     #if not options.subset_file:
     #    options.subset_file = 'subsets'
-    #if not options.triplet_file:
-    #    options.triplet_file = 'triplets'
+    if not options.triplet_file:
+        options.triplet_file = 'triplets'
     #if not options.tree_files:
     #    options.tree_files = ['subtrees.tre']
     #options.build = True
     #options.strict = True
     pass
 
-#have_triplets, have_trees, have_subsets, have_alignment, have_subtrees, have_besttree = False, False, False, False, False, False
-
-#read triplet file created by terraphy.triplets find_triplets_defining_edges_descending_from_node function
-'''
-if options.triplet_file and not triplets:
-    stderr_writer.write('Reading triplet file %s ...' % options.triplet_file)
-    triplets, labels = read_triplet_file(options.triplet_file)
-    stderr_writer.write(' done.\n')
-    have_triplets = True
-'''
 if options.simulate_coverage:
     taxa = int(options.simulate_coverage[0])
     loci = int(options.simulate_coverage[1])
     cov = options.simulate_coverage[2]
 
+    sim_tree = uniform_pure_birth(TaxonSet(['t%d' % num for num in xrange(taxa)]))
+    sim_tree.write_to_path('parent.tre', schema='nexus')
+
     mat = CoverageMatrix()
     mat.fill_random(taxa, loci, cov, lambda x, y, c: c, reference_taxon=True)
+    mat.print_subset_vectors()
     #exponential pdf is lam * e^(lam*x)
     #where scale param is 1/lam=mean
     #exp_scale = 1.0
@@ -1173,13 +1237,13 @@ if options.simulate_coverage:
     #mat.fill_random_locus_func(taxa, loci, partial(exponential, cov), min_coverage=0.2, max_coverage=0.8, reference_taxon=True)
     #mat.fill_random_taxon_func(taxa, loci, partial(exponential, cov), min_coverage=0.2, max_coverage=0.8, reference_taxon=True)
     #mat.print_subset_vectors()
-    profile_wrapper(mat.test_decisiveness, prof)
+    #profile_wrapper(mat.test_decisiveness, prof)
 
     prob = 1.0 - (taxa - 2.0) * (1.0 - cov**3)**loci
     #print 'Min prob decisive for tree: %f' % prob
-    stderr_writer.write('Min prob decisive for tree: %f\n' % prob)
+    #stderr_writer.write('Min prob decisive for tree: %f\n' % prob)
 
-if options.subset_file and not subsets:
+if options.subset_file:
     
     subsets = read_subset_file(options.subset_file)
     have_subsets = True
@@ -1207,121 +1271,73 @@ if options.subset_file and not subsets:
         button = Button(matrix_canvas, text='SORT', command=sort_and_redraw)
         matrix_canvas.create_window((0, 0), window=button, height=button.winfo_reqheight(), width=button.winfo_reqwidth(), anchor='nw')
         
-        #tk_root.mainloop()
     else:
         out_trans = ['-', 'X']
         for tax, cov in sorted(mat.per_taxon_presence_absence.items()):
             sys.stderr.write('%30s\t%s\n' % (tax, ''.join([out_trans[c] for c in cov])))
 
-'''
-if options.tree_files and not have_trees:
-    #stderr_writer.write('Reading tree file(s) %s ...' % options.tree_files)
-    trees = dendropy_read_treefile(options.tree_files, writer=stderr_writer)
-'''
-
-'''
-if options.parent_tree_file and not parent_tree:
-    #stderr_writer.write('Reading tree file(s) %s ...' % options.tree_files)
-    parent_tree = dendropy_read_treefile(options.parent_tree_file, writer=stderr_writer)
-'''
-'''
-if options.subtree_file and not subtrees:
-    #stderr_writer.write('Reading tree file(s) %s ...' % options.tree_files)
-    subtrees = dendropy_read_treefile(options.subtree_file, writer=stderr_writer)
-'''
-if options.triplets and not triplets:
-    profile_wrapper(calculate_triplets, prof, stdout_writer, options.subtree_file, stderr_writer)
-'''
-elif tk_gui:
-    opt = tk_gui.get_option('--triplet-file')
-    opt.add_save_and_callback_button('COMPUTE', calculate_triplets, options.tree_files)
-    tk_root.mainloop()
-    with open(opt.var, 'wb') as tfile:
-        tfile.write('%s\n' % ' '.join([tax for tax in sorted(opt.result[0])]))
-        tfile.write('%s\n' % '\n'.join([' '.join(trip) for trip in opt.result[1]]))
-'''
-
-if options.build:
-    if not options.triplet_file:
-        sys.exit('triplet file (-t) must be supplied to make BUILD tree')
-    
-    build_tree = profile_wrapper(make_build_tree, prof, stdout_writer, options.triplet_file, verbose=options.verbose)
-   
-    if options.open_tree_viewer:
-        open_tree_viewer(tree_viewer_command, 'build.tre', build_tree)
-    
-    #if tk_root:
-    #    tk_root.mainloop()
-
-if options.strict:
-    if not options.triplet_file:
-        sys.exit('triplet file (-t) must be supplied to make strict consensus tree')
-    
-    use_threads = False
-    if use_threads:
-        #threading is sort of working here, but needs a lot more work
-        #tk_gui.progress_bar.start()
-
-        class ThreadedTask(threading.Thread):
-            def __init__(self, queue, func, *args, **kwargs):
-                threading.Thread.__init__(self)
-                self.queue = queue
-                self.func = func
-                self.args = args
-                self.kwargs = kwargs
-            def run(self):
-                result = self.func(*self.args, **self.kwargs)
-                self.queue.put(result)
-
-        tk_gui.queue_thread(ThreadedTask(tk_gui.queue, make_strict_tree, labels, triplets))
-        tk_root.mainloop()
-        tk_root.mainloop()
-        strict_tree = tk_gui.result
+while True:
+    if options.build:
+        if not options.triplet_file:
+            sys.exit('triplet file (-t) must be supplied to make BUILD tree')
         
-        #tk_gui.progress_bar.stop()
-    else: 
-        strict_tree = profile_wrapper(make_strict_tree, prof, stdout_writer, options.triplet_file, verbose=options.verbose)
-    
-    if options.open_tree_viewer:
-        open_tree_viewer(tree_viewer_command, 'strict.tre', strict_tree)
-    
-    #if tk_root:
-    #    tk_root.mainloop()
+        build_tree = profile_wrapper(make_build_tree, prof, stdout_writer, options.triplet_file, messages=stderr_writer, verbose=options.verbose)
+       
+        if options.open_tree_viewer:
+            open_tree_viewer(tree_viewer_command, 'build.tre', build_tree)
+        
+    if options.strict:
+        if not options.triplet_file:
+            sys.exit('triplet file (-t) must be supplied to make strict consensus tree')
+        
+        use_threads = False
+        if use_threads and tk_gui:
+            #threading is sort of working here, but needs a lot more work
+            #tk_gui.progress_bar.start()
 
-if options.parents:
-    if not options.triplet_file:
-        sys.exit('triplet file (-t) must be supplied to count parent trees')
-    profile_wrapper(count_trees_on_terrace, prof, stdout_writer, options.triplet_file, messages=stderr_writer)
+            class ThreadedTask(threading.Thread):
+                def __init__(self, queue, func, *args, **kwargs):
+                    threading.Thread.__init__(self)
+                    self.queue = queue
+                    self.func = func
+                    self.args = args
+                    self.kwargs = kwargs
+                def run(self):
+                    result = self.func(*self.args, **self.kwargs)
+                    self.queue.put(result)
+
+            tk_gui.queue_thread(ThreadedTask(tk_gui.queue, make_strict_tree, stdout_writer, options.triplet_file, messages=stderr_writer, verbose=options.verbose))
+            tk_root.mainloop()
+            tk_root.mainloop()
+            strict_tree = tk_gui.result
+            
+            #tk_gui.progress_bar.stop()
+        else: 
+            strict_tree = profile_wrapper(make_strict_tree, prof, stdout_writer, options.triplet_file, messages=stderr_writer, verbose=options.verbose)
+        
+        if options.open_tree_viewer:
+            open_tree_viewer(tree_viewer_command, 'strict.tre', strict_tree)
+        
+    if options.parents:
+        if not options.triplet_file:
+            sys.exit('triplet file (-t) must be supplied to count parent trees')
+        profile_wrapper(count_trees_on_terrace, prof, stdout_writer, options.triplet_file, messages=stderr_writer)
+        if tk_root:
+            tk_root.mainloop()
+
+    if options.list_terraces:
+        if not options.subset_file or not options.treefiles_to_assign:
+            sys.exit('must specify both subset file (-s) and --trees-to-assign to assign trees to terraces')
+        profile_wrapper(assign_to_terraces, prof, stdout_writer, options.treefiles_to_assign, options.subset_file, messages=stderr_writer)
+
     if tk_root:
         tk_root.mainloop()
-
-if options.coverage:
-    if not options.alignment_file:
-        sys.exit('alignment file (-a) must be supplied to determine taxon coverage')
-    profile_wrapper(print_subsets, prof, stdout_writer, options.alignment_file, messages=stderr_writer)
-
-if options.display:
-    if not options.subset_file and options.tree_files:
-        sys.exit('must specify both subset file (-s) and tree file (--tree-files) to print displayed subtrees')
-    profile_wrapper(print_displayed_subtrees, prof, stdout_writer, options.parent_tree_file, options.subset_file, messages=stderr_writer)
-
-if options.list_terraces:
-    if not options.subset_file and options.tree_files:
-        sys.exit('must specify both subset file (-s) and tree file (--tree-files) to assign trees to terraces')
-    profile_wrapper(assign_to_terraces, prof, trees, subsets)
-
-if tk_root:
-    tk_root.mainloop()
-
+        #update the options namespace to match the current state of the gui
+        options = parser.parse_args(tk_gui.make_commandline_list())
+    else:
+        break
 
 if prof:
     output_profile(prof)
-    '''
-    s = StringIO.StringIO()
-    sortby = 'cumulative'
-    ps = pstats.Stats(prof, stream=s).sort_stats(sortby)
-    ps.print_stats()
-    ps.print_callers()
-    sys.stderr.write('%s\n' %s.getvalue())
-    '''
+
 
