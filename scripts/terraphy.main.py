@@ -866,9 +866,8 @@ def displayed_subtree(tree, labels, use_retain=False):
         else:
             newtree.prune_taxa(labels)
 
-    #not sure why I had delete_outdegree_one here, but doesn't work with DP4
-    #compat_encode_bipartitions(newtree, delete_outdegree_one=False)
-    compat_encode_bipartitions(newtree)
+    #compat_encode_bipartitions now maps delete_outdegree_one to collapse_unrooted_basal_bifurcation in DP 4
+    compat_encode_bipartitions(newtree, delete_outdegree_one=False)
     return newtree
 
 
