@@ -1368,7 +1368,12 @@ if len(sys.argv) == 1:
     
     preprocess.GUI_IGNORE = True
 
-    tk_root = Tk()
+    try:
+     tk_root = Tk()
+    except TclError as e:
+        print e
+        stderr_writer.write('\nUnable to start Tkinter GUI.  Use command line options.\n\n'.upper())
+        sys.exit()
     tk_gui = ArgparseGui(parser, tk_root, width=1200, height=720, destroy_when_done=False, progress_bar=False)
 
     #indicate dependencies between options to the gui, which will cause the dependent options to be disabled (greyed out) until the
