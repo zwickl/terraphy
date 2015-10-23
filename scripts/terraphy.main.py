@@ -13,7 +13,10 @@ from copy import deepcopy
 
 import cProfile, pstats, StringIO
 
-sys.path.append("../")
+#if terraphy isn't installed globally, and this script is being run from the examples directory, make sure it can find its own components
+opath=sys.path
+sys.path = [ "../" ] + opath
+
 from terraphy.triplets import *
 from terraphy.coverage import *
 from terraphy.dendroutils import compat_get_taxon_set, compat_encode_bipartitions, dendropy_read_treefile
