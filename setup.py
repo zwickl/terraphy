@@ -3,7 +3,7 @@
 ##############################################################################
 ##  Phylogenomic tools package.
 ##
-##  Copyright 2013 Derrick J. Zwickl
+##  Copyright 2015 Derrick J. Zwickl
 ##  All rights reserved.
 ##
 ##  See "LICENSE.txt" for terms and conditions of usage.
@@ -48,12 +48,9 @@ else:
     sys.stderr.write("searching for packages\n")
     PACKAGES = find_packages()
     EXTRA_KWARGS = dict(
-        install_requires = ['setuptools', 'dendropy', 'python-graph-core'], 
+        install_requires = ['setuptools', 'dendropy', ], 
         include_package_data=True
     )
-
-#this would be necessary to read gffs and rewrite alignments based on them (biopython too)
-#install_requires = ['setuptools', 'dendropy', 'distribute>=0.6.49', 'bcbio-gff'],
 
 PACKAGE_DIRS = [p.replace(".", os.path.sep) for p in PACKAGES]
 PACKAGE_INFO = [("% 40s : %s" % p) for p in zip(PACKAGES, PACKAGE_DIRS)]
@@ -65,33 +62,9 @@ ENTRY_POINTS = {}
 
 SCRIPT_SUBPATHS = [
     ['scripts', 'terraphy.main.py'],
-    ['scripts', 'maketriplets.py'],
 ]
 SCRIPTS = [os.path.join(*i) for i in SCRIPT_SUBPATHS]
 sys.stderr.write("\nscripts identified: %s\n" % "\n\t".join(SCRIPTS))
-
-'''
-try:
-    mpl_needed = '1.2'
-    import matplotlib
-    mpl_ver = matplotlib.__version__
-    if not float(mpl_ver[:3]) >= float(mpl_needed):
-        sys.stderr.write('*******************\nNOTE: matplotlib VERSION %s OR LATER IS REQUIRED (%s found).\nIT IS NECESSARY FOR ALL PLOTTING FUNCTIONALITY.\nYOU MAY NEED TO INSTALL IT MANUALLY (see http://matplotlib.org/downloads.html)\n*******************\n' % (mpl_needed, mpl_ver))
-
-except ImportError:
-    sys.stderr.write('*******************\nNOTE: matplotlib PACKAGE COULD NOT BE IMPORTED.\nIT IS NECESSARY FOR ALL PLOTTING FUNCTIONALITY.\nYOU MAY NEED TO INSTALL IT MANUALLY (see http://matplotlib.org/downloads.html)\n*******************\n')
-'''
-'''don't need biopython yet
-try:
-    bp_needed = '1.5'
-    import Bio
-    bp_ver = Bio.__version__
-    if not float(bp_ver[:3]) >= float(bp_needed):
-        sys.stderr.write('*******************\nNOTE: biopython VERSION %s OR LATER IS REQUIRED (%s found).\nIT IS NECESSARY FOR ALL PLOTTING FUNCTIONALITY.\nYOU MAY NEED TO INSTALL IT MANUALLY (see http://biopython.org/wiki/Download)\n*******************\n' % (bp_needed, bp_ver))
-
-except ImportError:
-    sys.stderr.write('*******************\nNOTE: matplotlib PACKAGE COULD NOT BE IMPORTED.\nIT IS NECESSARY FOR ALL PLOTTING FUNCTIONALITY.\nYOU MAY NEED TO INSTALL IT MANUALLY (see http://matplotlib.org/downloads.html)\n*******************\n')
-'''
 
 ###############################################################################
 # setuptools/distuils command extensions
@@ -106,16 +79,6 @@ else:
     ENTRY_POINTS[command_hook] = []
 
     ###########################################################################
-    # coverage
-    '''
-    from dendropy.test.support import coverage_analysis
-    if coverage_analysis.DENDROPY_COVERAGE_ANALYSIS_AVAILABLE:
-        sys.stderr.write("coverage analysis available ('python setup.py coverage')\n")
-        ENTRY_POINTS[command_hook].append("coverage = dendropy.test.support.coverage_analysis:CoverageAnalysis")
-    else:
-        sys.stderr.write("coverage analysis not available\n")
-    '''
-
 
 ###############################################################################
 # Main setup
