@@ -23,34 +23,16 @@ import os
 ###############################################################################
 # setuptools/distutils/etc. import and configuration
 
-try:
-    import ez_setup
-    try:
-        ez_setup_path = " ('" + os.path.abspath(ez_setup.__file__) + "')"
-    except OSError:
-        ez_setup_path = ""
-    sys.stderr.write("using ez_setup%s\n" %  ez_setup_path)
-    ez_setup.use_setuptools()
-    import setuptools
-    try:
-        setuptools_path = " ('" +  os.path.abspath(setuptools.__file__) + "')"
-    except OSError:
-        setuptools_path = ""
-    sys.stderr.write("using setuptools%s\n" % setuptools_path)
-    from setuptools import setup, find_packages
-except ImportError, e:
-    sys.stderr.write("using distutils\n")
-    from distutils.core import setup
-    sys.stderr.write("using canned package list\n")
-    PACKAGES = ['terraphy']
-    EXTRA_KWARGS = {}
-else:
-    sys.stderr.write("searching for packages\n")
-    PACKAGES = find_packages()
-    EXTRA_KWARGS = dict(
-        install_requires = ['setuptools', 'dendropy', ], 
-        include_package_data=True
+from setuptools import setup, find_packages
+
+sys.stderr.write("searching for packages\n")
+PACKAGES = find_packages()
+EXTRA_KWARGS = dict(
+    install_requires = ['dendropy', ], 
+    include_package_data=True,
+    zip_safe=True
     )
+
 
 PACKAGE_DIRS = [p.replace(".", os.path.sep) for p in PACKAGES]
 PACKAGE_INFO = [("% 40s : %s" % p) for p in zip(PACKAGES, PACKAGE_DIRS)]
@@ -84,7 +66,6 @@ else:
 # Main setup
 
 __version__ = 1.0
-EXTRA_KWARGS["zip_safe"] = True
 
 ### compose long description ###
 long_description = open('README.txt').read()
