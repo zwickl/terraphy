@@ -5,17 +5,16 @@ INPUTDIR=input/Bouchenak/
 TREE=$INPUTDIR/bestTree.phy
 ALN=$INPUTDIR/aln.exported.nex 
 
+OUTDIR=output/
+mkdir -p $OUTDIR
+
 PERLSCRIPTDIR=perlScripts/
-
-OUTPUTDIR=output/
-mkdir -p $OUTPUTDIR
-
 if [ -d "$PERLSCRIPTDIR" ];then
-    $PERLSCRIPTDIR/parseNexusCharSetToDAV.pl -f $ALN > $OUTPUTDIR/perlSubsets || exit
-    $PERLSCRIPTDIR/displaysub.pl $TREE $OUTPUTDIR/perlSubsets > $OUTPUTDIR/perlSubtrees || exit
-    $PERLSCRIPTDIR/maketriplets.pl $OUTPUTDIR/perlSubtrees > $OUTPUTDIR/perlTriplets || exit
-    $PERLSCRIPTDIR/countParents.pl $OUTPUTDIR/perlTriplets > $OUTPUTDIR/perlParents || exit
-    #$PERLSCRIPTDIR/sameTerrace.pl $INPUTDIR/100pars.phy $OUTPUTDIR/perlSubsets $OUTPUTDIR/perlTerraceList || exit
+    $PERLSCRIPTDIR/parseNexusCharSetToDAV.pl -f $ALN > $OUTDIR/perlSubsets || exit
+    $PERLSCRIPTDIR/displaysub.pl $TREE $OUTDIR/perlSubsets > $OUTDIR/perlSubtrees || exit
+    $PERLSCRIPTDIR/maketriplets.pl $OUTDIR/perlSubtrees > $OUTDIR/perlTriplets || exit
+    $PERLSCRIPTDIR/countParents.pl $OUTDIR/perlTriplets > $OUTDIR/perlParentCount || exit
+    #$PERLSCRIPTDIR/sameTerrace.pl $INPUTDIR/100pars.phy $OUTDIR/perlSubsets > $OUTDIR/perlTerraceList || exit
 fi
 
 TERRAPHYDIR=../scripts/
@@ -23,28 +22,33 @@ MAIN=$TERRAPHYDIR/terraphy.main.py
 
 #making the subsets currently takes a while in terraphy, so can copy over 
 #the perl version if desired
-#cp $OUTPUTDIR/perlSubsets $OUTPUTDIR/subsets
-if [ ! -e $OUTPUTDIR/subsets ];then
+#cp $OUTDIR/perlSubsets $OUTDIR/subsets
+
+if [ ! -e $OUTDIR/subsets ];then
     echo SUBSETS
-    $MAIN --coverage -a $ALN > $OUTPUTDIR/subsets || exit
+    $MAIN --coverage --alignment-file $ALN > $OUTDIR/subsets || exit
 fi
 
-rm -f $OUTPUTDIR/subtrees $OUTPUTDIR/triplets $OUTPUTDIR/parents $OUTPUTDIR/build.tre
+rm -f $OUTDIR/subtrees $OUTDIR/triplets $OUTDIR/parents $OUTDIR/build.tre $OUTDIR/strict.tre
 
 echo SUBTREES
-$MAIN --display --tree-files $TREE --subset-file $OUTPUTDIR/subsets > $OUTPUTDIR/subtrees || exit
+$MAIN --display --parent-tree $TREE --subset-file $OUTDIR/subsets > $OUTDIR/subtrees || exit
 
 echo TRIPLETS
-$TERRAPHYDIR/maketriplets.py $OUTPUTDIR/subtrees > $OUTPUTDIR/triplets || exit
-#grep -v "[ ].*[ ].*[ ].*" temp >> $OUTPUTDIR/triplets || exit
-perl -p -i -e 's/^.*1034h//g' $OUTPUTDIR/triplets
+$MAIN -t --subtree-file $OUTDIR/subtrees > $OUTDIR/triplets || exit
+#grep -v "[ ].*[ ].*[ ].*" temp >> $OUTDIR/triplets || exit
+#some giberish sometimes gets output to the stream
+perl -p -i -e 's/^.*1034h//g' $OUTDIR/triplets
 
 echo PARENTS
-$MAIN --parents --triplet-file $OUTPUTDIR/triplets > $OUTPUTDIR/parents || exit
+$MAIN --parents --triplet-file $OUTDIR/triplets > $OUTDIR/parentCount || exit
 
 echo BUILD
-$MAIN --build --triplet-file $OUTPUTDIR/triplets > $OUTPUTDIR/build.tre || exit
+$MAIN --build --triplet-file $OUTDIR/triplets > $OUTDIR/build.tre || exit
+
+echo BUILD
+$MAIN --strict --triplet-file $OUTDIR/triplets > $OUTDIR/strict.tre || exit
 
 echo TERRACES
-../scripts/terraphy.main.py --list-terraces --subset-file $OUTPUTDIR/subsets --tree-files $INPUTDIR/100pars.tre > $OUTPUTDIR/terraceList
+../scripts/terraphy.main.py --list-terraces --subset-file $OUTDIR/subsets --treefiles-to-assign $INPUTDIR/100pars.tre > $OUTDIR/terraceList
 

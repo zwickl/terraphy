@@ -1,6 +1,10 @@
 #!/usr/bin/env python
-from tkarg.tkinterutils import *
+import sys
 from random import sample, random
+
+#should funcs here that use tkinterutils be moved there?
+#something better needs to be done if this import fails
+#from tkarg.tkinterutils import *
 
 
 class CoverageMatrix(object):
