@@ -28,6 +28,4 @@ Sukumaran J, Holder MT. 2010. DendroPy: a Python library for phylogenetic
     computing. Bioinformatics. 26(12):1569-1571.
 http://pythonhosted.org/DendroPy/
 
--The python-graph graph library
-
 
