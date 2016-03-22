@@ -1,17 +1,12 @@
 #! /usr/bin/env python
 
 ##############################################################################
-##  Phylogenomic tools package.
+##  Terraphy: Scripts for analyzing phylogenetic terraces.
 ##
 ##  Copyright 2015 Derrick J. Zwickl
 ##  All rights reserved.
 ##
 ##  See "LICENSE.txt" for terms and conditions of usage.
-##
-##  If you use this work or any portion thereof in published work,
-##  please cite it as:
-##
-##     REF
 ##
 ##############################################################################
 
@@ -76,7 +71,7 @@ setup(name='terraphy',
       author_email='zwickl@email.arizona.edu',
       url='https://github.com/zwickl/terraphy',
       description='Scripts for analyzing phylogenetic terraces.',
-      license='GPL3',
+      license='MIT',
       packages=PACKAGES,
       package_dir=dict(zip(PACKAGES, PACKAGE_DIRS)),
       scripts = SCRIPTS,
