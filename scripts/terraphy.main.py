@@ -28,9 +28,9 @@ try:
     
     #for dendropy 4 compatability
     try:
-        from dendropy.error import DataError
+        from dendropy.error import DataError as DataParseError
     except:
-        from dendropy.utility.error import DataError
+        from dendropy.utility.error import DataParseError
 
     try:
         from dendropy.treesim import uniform_pure_birth
