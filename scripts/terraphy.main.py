@@ -15,11 +15,12 @@ import cProfile, pstats, StringIO
 
 #if terraphy isn't installed globally, and this script is being run from the examples directory, make sure it can find its own components
 opath=sys.path
-sys.path = [ "../" ] + opath
+sys.path = [ "../" ] + ["../../"] + opath
 
 from terraphy.triplets import *
 from terraphy.coverage import *
-from terraphy.dendroutils import compat_get_taxon_set, compat_encode_bipartitions, dendropy_read_treefile
+from terraphy.dendroutils import dendropy_read_treefile 
+from terraphy.dendroutils import compat_encode_bipartitions
 
 #DENDROPY PACKAGE
 try:
@@ -1073,7 +1074,7 @@ def read_subset_file(subset_file):
     return subsets
  
 
-def displayed_subtree(tree, labels, use_retain=False):
+def displayed_subtree(tree, labels):
     #this is annoying, but Dendropy can consider the labels not matching depending on 
     #underscore vs. space issues
     #Realized that using retain_taxa vs prune_taxa doesn't make any difference - dendropy
@@ -1085,15 +1086,9 @@ def displayed_subtree(tree, labels, use_retain=False):
         newtree = Tree(tree, taxon_set=tree.taxon_set)
 
     if isinstance(labels[0], str):
-        if use_retain:
             newtree.retain_taxa_with_labels(labels)
-        else:
-            newtree.prune_taxa_with_labels(labels)
     else:
-        if use_retain:
             newtree.retain_taxa(labels)
-        else:
-            newtree.prune_taxa(labels)
 
     #compat_encode_bipartitions now maps delete_outdegree_one to collapse_unrooted_basal_bifurcation in DP 4
     compat_encode_bipartitions(newtree, delete_outdegree_one=False)
@@ -1131,7 +1126,8 @@ def print_displayed_subtrees(out, trees, subsets, messages=sys.stderr):
     
     for tnum, tree in enumerate(trees):
         tree.is_label_lookup_case_sensitive = True
-        taxon_label_map = { taxon.label:taxon for taxon in compat_get_taxon_set(tree) }
+        #taxon_label_map = { taxon.label:taxon for taxon in compat_get_taxon_set(tree) }
+        taxon_label_map = { taxon.label:taxon for taxon in tree.taxon_namespace }
 
         for setnum, retain in enumerate(subsets):
             messages.write('pruning tree %d to taxon set %d\n' % (tnum, setnum))
@@ -1569,8 +1565,9 @@ while True:
 
     if options.list_terraces:
         if not options.subset_file or not options.treefiles_to_assign:
-            sys.exit('must specify both subset file (-s) and --trees-to-assign to assign trees to terraces')
-        profile_wrapper(assign_to_terraces, prof, stdout_writer, options.treefiles_to_assign, options.subset_file, messages=stderr_writer)
+            sys.exit('must specify both subset file (-s) and --treefiles-to-assign to assign trees to terraces')
+        #profile_wrapper(assign_to_terraces, prof, stdout_writer, options.treefiles_to_assign, options.subset_file, messages=stderr_writer)
+        profile_wrapper(assign_to_terraces_using_hashes, prof, stdout_writer, options.treefiles_to_assign, options.subset_file, messages=stderr_writer)
 
     if tk_root:
         tk_root.mainloop()
