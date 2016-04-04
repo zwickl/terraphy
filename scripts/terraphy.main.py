@@ -1188,19 +1188,21 @@ def assign_to_terraces(out, treefiles, subset_file, messages=sys.stderr):
     this_tree_subtrees = TreeList( [displayed_subtree(trees[0], subset) for subset in subsets] )
     terrace_subtree_list = [this_tree_subtrees]
     terrace_size = {0:1}
-   
+    
     if out:
         if isinstance(out, str):
             out_stream = open(out, 'w')
         else:
             out_stream = out
 
+    out_stream.write('tree 1 is on terrace 0\n')
+    
     #assign this same TaxonSet to all of the TreeLists created, otherwise bad things happen when trying to compare taxa and splits
-    global_taxon_set = compat_get_taxon_set(this_tree_subtrees)
+    global_taxon_set = this_tree_subtrees.taxon_namespace
     
     #now start with the second tree
-    for tree_num, tree in enumerate(trees[1:], 1):
-        this_tree_subtrees = TreeList( [displayed_subtree(tree, subset) for subset in subsets], taxon_set=global_taxon_set )
+    for tree_num, tree in enumerate(trees[1:], 2):
+        this_tree_subtrees = TreeList( [displayed_subtree(tree, subset) for subset in subsets], taxon_namespace=global_taxon_set )
         for terrace_num, terrace_subtrees in enumerate(terrace_subtree_list):
             terrace_match = True
             for sub1, sub2 in izip(terrace_subtrees, this_tree_subtrees):
@@ -1215,12 +1217,15 @@ def assign_to_terraces(out, treefiles, subset_file, messages=sys.stderr):
                 break
         else:
             #get here if went through all terraces with no match
-            out_stream.write('tree %d is on a new terrace\n' % tree_num)
+            out_stream.write('tree %d is on terrace %d\n' % (tree_num, len(terrace_subtree_list)))
             terrace_size[len(terrace_subtree_list)] = 1
             terrace_subtree_list.append(this_tree_subtrees)
 
     messages.write(' done.')
-    out_stream.write('%d terraces found' % len(terrace_size))
+    out_stream.write('terrace sizes:\n\tterrace\t#assigned\n')
+    for n, s in terrace_size.items():
+        out_stream.write('\t%d\t%d\n' %  (n, s))
+    out_stream.write('%d terraces found\n' % len(terrace_size))
 
 
 def assign_to_terraces_using_hashes(out, treefiles, subset_file, messages=sys.stderr):
@@ -1251,9 +1256,10 @@ def assign_to_terraces_using_hashes(out, treefiles, subset_file, messages=sys.st
     this_tree_subtrees = [ sum([ hash(n.edge.split_bitmask) for n in displayed_subtree(trees[0], subset).internal_nodes() ]) for subset in subsets]
     terrace_subtree_list = [this_tree_subtrees]
     terrace_size = {0:1}
+    out_stream.write('tree 1 is on terrace 0\n')
     
     #now start with the second tree
-    for tree_num, tree in enumerate(trees[1:], 1):
+    for tree_num, tree in enumerate(trees[1:], 2):
         this_tree_subtrees = [ sum([ hash(n.edge.split_bitmask) for n in displayed_subtree(tree, subset).internal_nodes() ]) for subset in subsets]
         for terrace_num, terrace_subtrees in enumerate(terrace_subtree_list):
             #if all subtrees matched, terrace is same
@@ -1263,12 +1269,9 @@ def assign_to_terraces_using_hashes(out, treefiles, subset_file, messages=sys.st
                 break
         else:
             #get here if went through all terraces with no match
-            out_stream.write('tree %d is on a new terrace\n' % tree_num)
+            out_stream.write('tree %d is on terrace %d\n' % (tree_num, len(terrace_subtree_list)))
             terrace_size[len(terrace_subtree_list)] = 1
             terrace_subtree_list.append(this_tree_subtrees)
-
-    messages.write(' done.')
-    out_stream.write('%d terraces found' % len(terrace_size))
 
 
 def num_trees(taxa):
@@ -1341,7 +1344,7 @@ analyses.add_argument('-b', '--build', action='store_true', default=False, help=
 
 analyses.add_argument('-s', '--strict', action='store_true', default=False, help='compute a strict consensus tree from a triplet file (requires --triplet-file)')
 
-analyses.add_argument('-l', '--list-terraces', action='store_true', default=False, help='take a set of trees and assign them to terraces (requires --subset-file and --tree-files)')
+analyses.add_argument('-l', '--list-terraces', action='store_true', default=False, help='take a set of trees and assign them to terraces (requires --subset-file and --treefiles-to-assign)')
 
 parser.add_argument('--simulate-coverage', type=float, nargs=3, default=None, help='simulate coverage matrices, using 3 values, #taxa #loci coverage')
 
