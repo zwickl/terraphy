@@ -1131,7 +1131,7 @@ def print_displayed_subtrees(out, trees, subsets, messages=sys.stderr):
 
         for setnum, retain in enumerate(subsets):
             messages.write('pruning tree %d to taxon set %d\n' % (tnum, setnum))
-            newtree = displayed_subtree(tree, [ taxon_label_map[t] for t in retain ], use_retain=True)
+            newtree = displayed_subtree(tree, [ taxon_label_map[t] for t in retain ])
             newtreestr = newtree.as_string(schema='newick', suppress_internal_node_labels=True, suppress_rooting=True)
             out_stream.write('%s' % newtreestr)
        
@@ -1237,7 +1237,7 @@ def assign_to_terraces_using_hashes(out, treefiles, subset_file, messages=sys.st
     
     if isinstance(treefiles, str):
         trees = dendropy_read_treefile([treefiles], writer=messages)
-    elif isinstance(trees[0], str):
+    elif isinstance(treefiles[0], str):
         trees = dendropy_read_treefile(treefiles, writer=messages)
    
     for tree in trees:
@@ -1273,6 +1273,11 @@ def assign_to_terraces_using_hashes(out, treefiles, subset_file, messages=sys.st
             terrace_size[len(terrace_subtree_list)] = 1
             terrace_subtree_list.append(this_tree_subtrees)
 
+    messages.write(' done.')
+    out_stream.write('terrace sizes:\n\tterrace\t#assigned\n')
+    for n, s in terrace_size.items():
+        out_stream.write('\t%d\t%d\n' %  (n, s))
+    out_stream.write('%d terraces found\n' % len(terrace_size))
 
 def num_trees(taxa):
     '''The number of tree topologies for the given number of taxa'''
@@ -1432,7 +1437,7 @@ else:
 
     if options.display:
         if not options.subset_file and options.parent_tree_file:
-            sys.exit('must specify both subset file (-s) and tree file (--tree-files) to print displayed subtrees')
+            sys.exit('must specify both subset file (-s) and tree file (--parent-tree-file) to print displayed subtrees')
         profile_wrapper(print_displayed_subtrees, prof, stdout_writer, options.parent_tree_file, options.subset_file, messages=stderr_writer)
 
     if options.triplets:
