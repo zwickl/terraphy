@@ -1343,7 +1343,8 @@ analyses = parser.add_argument_group('Analyses to be performed on files created 
 
 analyses.add_argument('-p', '--parents', action='store_true', default=False, help='compute the number of parent trees given a triplets file (requires --triplet-file')
 
-analyses.add_argument('--generate-parents', action='store_true', default=False, help='compute the number of parent trees given a triplets file (requires --triplet-file')
+#not implemented yet
+#analyses.add_argument('--generate-parents', action='store_true', default=False, help='compute the number of parent trees given a triplets file (requires --triplet-file')
 
 analyses.add_argument('-b', '--build', action='store_true', default=False, help='compute the BUILD tree from a triplet file (requires --triplet-file)')
 
