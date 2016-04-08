@@ -1144,8 +1144,10 @@ def same_tree(reference_tree, test_tree):
     Should handle polytomies fine.
     '''
 
-    ref_tset = compat_get_taxon_set(reference_tree)
-    test_tset = compat_get_taxon_set(test_tree)
+    #ref_tset = compat_get_taxon_set(reference_tree)
+    #test_tset = compat_get_taxon_set(test_tree)
+    ref_tset = reference_tree.taxon_namespace
+    test_tset =test_tree.taxon_namespace
     if ref_tset is not test_tset:
         raise TypeError("Trees have different TaxonSet objects: %s vs. %s" \
                 % (hex(id(ref_tset)), hex(id(test_tset))))
@@ -1184,18 +1186,17 @@ def assign_to_terraces(out, treefiles, subset_file, messages=sys.stderr):
    
     subsets = read_subset_file(subset_file)
     
-    #the first tree has to be its own terrace
-    this_tree_subtrees = TreeList( [displayed_subtree(trees[0], subset) for subset in subsets] )
-    terrace_subtree_list = [this_tree_subtrees]
-    terrace_size = {0:1}
-    
     if out:
         if isinstance(out, str):
             out_stream = open(out, 'w')
         else:
             out_stream = out
 
-    out_stream.write('tree 1 is on terrace 0\n')
+    #the first tree has to be its own terrace
+    this_tree_subtrees = TreeList( [displayed_subtree(trees[0], subset) for subset in subsets] )
+    terrace_subtree_list = [this_tree_subtrees]
+    terrace_size = {0:1}
+    out_stream.write('tree 1 is on terrace 1\n')
     
     #assign this same TaxonSet to all of the TreeLists created, otherwise bad things happen when trying to compare taxa and splits
     global_taxon_set = this_tree_subtrees.taxon_namespace
@@ -1212,19 +1213,19 @@ def assign_to_terraces(out, treefiles, subset_file, messages=sys.stderr):
                     break
             #if all subtrees matched, terrace is same
             if terrace_match:
-                out_stream.write('tree %d is on terrace %d\n' % (tree_num, terrace_num))
+                out_stream.write('tree %d is on terrace %d\n' % (tree_num, terrace_num+1))
                 terrace_size[terrace_num] += 1
                 break
         else:
             #get here if went through all terraces with no match
-            out_stream.write('tree %d is on terrace %d\n' % (tree_num, len(terrace_subtree_list)))
+            out_stream.write('tree %d is on terrace %d\n' % (tree_num, len(terrace_subtree_list)+1))
             terrace_size[len(terrace_subtree_list)] = 1
             terrace_subtree_list.append(this_tree_subtrees)
 
     messages.write(' done.')
     out_stream.write('terrace sizes:\n\tterrace\t#assigned\n')
     for n, s in terrace_size.items():
-        out_stream.write('\t%d\t%d\n' %  (n, s))
+        out_stream.write('\t%d\t%d\n' %  (n+1, s))
     out_stream.write('%d terraces found\n' % len(terrace_size))
 
 
@@ -1256,7 +1257,7 @@ def assign_to_terraces_using_hashes(out, treefiles, subset_file, messages=sys.st
     this_tree_subtrees = [ sum([ hash(n.edge.split_bitmask) for n in displayed_subtree(trees[0], subset).internal_nodes() ]) for subset in subsets]
     terrace_subtree_list = [this_tree_subtrees]
     terrace_size = {0:1}
-    out_stream.write('tree 1 is on terrace 0\n')
+    out_stream.write('tree 1 is on terrace 1\n')
     
     #now start with the second tree
     for tree_num, tree in enumerate(trees[1:], 2):
@@ -1264,19 +1265,19 @@ def assign_to_terraces_using_hashes(out, treefiles, subset_file, messages=sys.st
         for terrace_num, terrace_subtrees in enumerate(terrace_subtree_list):
             #if all subtrees matched, terrace is same
             if terrace_subtrees == this_tree_subtrees:
-                out_stream.write('tree %d is on terrace %d\n' % (tree_num, terrace_num))
+                out_stream.write('tree %d is on terrace %d\n' % (tree_num, terrace_num+1))
                 terrace_size[terrace_num] += 1
                 break
         else:
             #get here if went through all terraces with no match
-            out_stream.write('tree %d is on terrace %d\n' % (tree_num, len(terrace_subtree_list)))
+            out_stream.write('tree %d is on terrace %d\n' % (tree_num, len(terrace_subtree_list)+1))
             terrace_size[len(terrace_subtree_list)] = 1
             terrace_subtree_list.append(this_tree_subtrees)
 
     messages.write(' done.')
     out_stream.write('terrace sizes:\n\tterrace\t#assigned\n')
     for n, s in terrace_size.items():
-        out_stream.write('\t%d\t%d\n' %  (n, s))
+        out_stream.write('\t%d\t%d\n' %  (n +1 , s))
     out_stream.write('%d terraces found\n' % len(terrace_size))
 
 def num_trees(taxa):
@@ -1565,18 +1566,20 @@ while True:
         if tk_root:
             tk_root.mainloop()
 
+    '''
     if options.generate_parents:
         if not options.triplet_file:
             sys.exit('triplet file (-t) must be supplied to count parent trees')
         profile_wrapper(generate_trees_on_terrace, prof, stdout_writer, options.triplet_file, messages=stderr_writer)
         if tk_root:
             tk_root.mainloop()
+    '''
 
     if options.list_terraces:
         if not options.subset_file or not options.treefiles_to_assign:
             sys.exit('must specify both subset file (-s) and --treefiles-to-assign to assign trees to terraces')
-        #profile_wrapper(assign_to_terraces, prof, stdout_writer, options.treefiles_to_assign, options.subset_file, messages=stderr_writer)
-        profile_wrapper(assign_to_terraces_using_hashes, prof, stdout_writer, options.treefiles_to_assign, options.subset_file, messages=stderr_writer)
+        profile_wrapper(assign_to_terraces, prof, stdout_writer, options.treefiles_to_assign, options.subset_file, messages=stderr_writer)
+        #profile_wrapper(assign_to_terraces_using_hashes, prof, stdout_writer, options.treefiles_to_assign, options.subset_file, messages=stderr_writer)
 
     if tk_root:
         tk_root.mainloop()
