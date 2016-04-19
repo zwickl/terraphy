@@ -247,6 +247,7 @@ def build_or_strict_consensus(label_set, full_label_set, triplets, all_triplets,
         #No triplets, so no internal branches within clade.  So, add polytomy of leaves
         for label in label_set:
             node.add_child(Node(label=label))
+
     else:
         #This returns one component for each of the clades descending from this node
         #The members of the component indicate the labels in each clade
@@ -276,7 +277,7 @@ def build_or_strict_consensus(label_set, full_label_set, triplets, all_triplets,
                     if build or is_edge_in_all_trees(comp, full_label_set, all_triplets, precomp=precomp, verbose=verbose):
                          if verbose:
                             print '\tNEW CHERRY'
-                         new_node = node.add_child(Node())
+                         new_node = node.new_child()
                     else:
                         if verbose:
                             print '\tREJECTED', comp
@@ -294,7 +295,7 @@ def build_or_strict_consensus(label_set, full_label_set, triplets, all_triplets,
                     if build or is_edge_in_all_trees(comp, full_label_set, all_triplets, precomp=precomp, verbose=verbose):
                          if verbose:
                             print '\tNEW CLADE'
-                         new_node = node.add_child(Node())
+                         new_node = node.new_child()
                     else:
                         if verbose:
                             print '\tREJECTED', comp
@@ -641,7 +642,7 @@ def combine_subtrees(left_treelist, right_treelist):
         for right in right_treelist:
             assert(len(right.seed_node._child_nodes) == 1)
             combined = Tree()
-            subtree_root = combined.seed_node.add_child(Node())
+            subtree_root = combined.seed_node.new_node()
             subtree_root.add_child(left.seed_node._child_nodes[0])
             subtree_root.add_child(right.seed_node._child_nodes[0])
             subtrees.append(combined)
@@ -685,14 +686,13 @@ def generate_trees_on_terrace(out, triplet_file, messages=sys.stderr):
     
     return num_par, parents
 
-
 def three_taxon_subtrees(label_set):
     subtrees = TreeList()
     for out, in1, in2 in ([0, 1, 2], [1, 0, 2], [2, 0, 1]):
         new_subtree = Tree()
-        subtree_root = new_subtree.seed_node.add_child(Node())
+        subtree_root = new_subtree.seed_node.new_child()
         subtree_root.add_child(Node(label=label_set[out]))
-        new_node = subtree_root.add_child(Node())
+        new_node = subtree_root.new_node()
 
         new_node.add_child(Node(label=label_set[in1]))
         new_node.add_child(Node(label=label_set[in2]))
