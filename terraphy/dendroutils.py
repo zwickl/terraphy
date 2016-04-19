@@ -36,7 +36,7 @@ def compat_encode_bipartitions(tree, **kwargs):
             val = kwargs.pop('delete_outdegree_one')
             kwargs['collapse_unrooted_basal_bifurcation'] = val
         tree.encode_bipartitions(**kwargs)
-    elif not hasattr(tree, "split_edges") or not tree.split_edges:
+    elif not hasattr(tree, "bipartition_encoding") or not tree.bipartition_encoding:
         treesplit.encode_splits(tree, **kwargs)
 
 

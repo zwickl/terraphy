@@ -1154,7 +1154,8 @@ def same_tree(reference_tree, test_tree):
 
     compat_encode_bipartitions(reference_tree)
     compat_encode_bipartitions(test_tree)
-    
+
+    '''
     #seems like this set comparison should be faster, but not really
     if isinstance(reference_tree.split_edges, dict):
         if set(reference_tree.split_edges.keys()) != set(test_tree.split_edges.keys()):
@@ -1162,14 +1163,13 @@ def same_tree(reference_tree, test_tree):
     elif set(reference_tree.split_edges) != set(test_tree.split_edges):
         return False
     '''
-    for split in reference_tree.split_edges:
-        if split not in test_tree.split_edges:
+    for split in reference_tree.bipartition_encoding:
+        if split not in test_tree.bipartition_encoding:
             return False
 
-    for split in test_tree.split_edges:
-        if split not in reference_tree.split_edges:
+    for split in test_tree.bipartition_encoding:
+        if split not in reference_tree.bipartition_encoding:
             return False
-    '''
 
     return True
 
