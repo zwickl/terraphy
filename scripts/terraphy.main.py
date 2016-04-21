@@ -24,7 +24,7 @@ from terraphy.dendroutils import compat_encode_bipartitions
 
 #DENDROPY PACKAGE
 try:
-    from dendropy import TreeList, Tree, Node, DataSet, Taxon, TaxonSet
+    from dendropy import TreeList, Tree, Node, DataSet, Taxon, TaxonSet, TaxonNamespace
     #from dendropy.treecalc import symmetric_difference
     
     #for dendropy 4 compatability
@@ -192,12 +192,15 @@ def debug_output(label_set, triplets, components, level=0):
 
 
 def make_build_tree(out, triplet_file, messages=sys.stderr, verbose=False):
-    tree = Tree()
     
     messages.write('Computing BUILD consensus tree...\n')
     label_set, triplets = read_triplet_file(triplet_file, messages=messages)
     
-    build_or_strict_consensus(label_set, set(label_set), triplets, triplets, tree.seed_node, build=True, verbose=verbose)
+    tree = Tree()
+    tns =  TaxonNamespace(label_set)
+    tree.taxon_namespace = tns
+    
+    build_or_strict_consensus(label_set, set(label_set), triplets, triplets, tree.seed_node, tns, build=True, verbose=verbose)
    
     if out:
         if isinstance(out, str):
@@ -212,12 +215,15 @@ def make_build_tree(out, triplet_file, messages=sys.stderr, verbose=False):
 
 
 def make_strict_tree(out, triplet_file, messages=sys.stderr, verbose=False):
-    tree = Tree()
     
     messages.write('Computing strict consensus tree (this can take some time)...\n')
     label_set, triplets = read_triplet_file(triplet_file, messages=messages)
     
-    build_or_strict_consensus(label_set, set(label_set), triplets, triplets, tree.seed_node, build=False, verbose=verbose)
+    tree = Tree()
+    tns =  TaxonNamespace(label_set)
+    tree.taxon_namespace = tns
+    
+    build_or_strict_consensus(label_set, set(label_set), triplets, triplets, tree.seed_node, tns, build=False, verbose=verbose)
    
     if out:
         if isinstance(out, str):
@@ -231,7 +237,7 @@ def make_strict_tree(out, triplet_file, messages=sys.stderr, verbose=False):
     return tree
 
 
-def build_or_strict_consensus(label_set, full_label_set, triplets, all_triplets, node, build, precomp=None, verbose=False):
+def build_or_strict_consensus(label_set, full_label_set, triplets, all_triplets, node, taxon_namespace, build, precomp=None, verbose=False):
     '''This function constructs the BUILD tree for given triplets or the strict consensus.
     The algorithms are essentially the same, the strict consensus just does a lot of
     extra work to see if an edge occurs in all trees before adding it.
@@ -246,7 +252,7 @@ def build_or_strict_consensus(label_set, full_label_set, triplets, all_triplets,
     if not triplets:
         #No triplets, so no internal branches within clade.  So, add polytomy of leaves
         for label in label_set:
-            node.add_child(Node(label=label))
+            node.new_child(taxon=taxon_namespace.require_taxon(label=label)) 
 
     else:
         #This returns one component for each of the clades descending from this node
@@ -265,7 +271,7 @@ def build_or_strict_consensus(label_set, full_label_set, triplets, all_triplets,
                 if len(comp) == 1:
                     #if only one label in component, add leaf
                     #can't index sets, so need to use pop
-                    node.add_child(Node(label=comp.pop()))
+                    node.new_child(taxon=taxon_namespace.require_taxon(comp.pop())) 
                     if verbose:
                         print '\tNEW SINGLETON'
                 elif len(comp) == 2:
@@ -283,7 +289,7 @@ def build_or_strict_consensus(label_set, full_label_set, triplets, all_triplets,
                             print '\tREJECTED', comp
                         new_node = node
                     for el in comp:
-                        new_node.add_child(Node(label=el))
+                        new_node.new_child(taxon=taxon_namespace.require_taxon(label=el)) 
                 else:
                     #if > 2 labels in component, filter triplets to only include those in which both ingroups and outgroup 
                     #are in the label set of the component, i.e. are in the clade of interest
@@ -300,7 +306,7 @@ def build_or_strict_consensus(label_set, full_label_set, triplets, all_triplets,
                         if verbose:
                             print '\tREJECTED', comp
                         new_node = node
-                    build_or_strict_consensus(comp, full_label_set, new_trip, all_triplets, new_node, build, precomp=precomp, verbose=verbose)
+                    build_or_strict_consensus(comp, full_label_set, new_trip, all_triplets, new_node, taxon_namespace, build, precomp=precomp, verbose=verbose)
         else:
             raise IncompatibleTripletException('Input is incompatible!')
 
