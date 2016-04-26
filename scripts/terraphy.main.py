@@ -95,9 +95,13 @@ def profile_wrapper(func, profiler, *args, **kwargs):
     '''
     if profiler:
         profiler.enable()
+    try:
     result = func(*args, **kwargs)
+    except KeyboardInterrupt:
+        print 'terminating profiling'
     if profiler:
         profiler.disable()
+        raise KeyboardInterrupt
     return result
 
 
@@ -1490,110 +1494,114 @@ if options.simulate_coverage:
     #print 'Min prob decisive for tree: %f' % prob
     #stderr_writer.write('Min prob decisive for tree: %f\n' % prob)
 
-if options.subset_file:
-    
-    subsets = read_subset_file(options.subset_file)
-    have_subsets = True
-    
-    mat = CoverageMatrix()
-    mat.fill_from_subsets(subsets)
+try:
 
-    loci_per_taxon =  mat.loci_per_taxon()
-    mat.calculate_statistics()
-    
-    if tk_root:
-        bar_canvas = results_window.add_canvas_pane(0, 1)
-        mat.draw_barplot(bar_canvas, loci_per_taxon, 0, 0, bar_canvas.winfo_reqwidth(), bar_canvas.winfo_reqheight())
+    if options.subset_file:
         
-        matrix_canvas = results_window.add_canvas_pane(1, 0, column_span=2)
-        mat.draw_matrix_graphic(matrix_canvas, mat.taxa, 0, 0, matrix_canvas.winfo_reqwidth(), matrix_canvas.winfo_reqheight())
+        subsets = read_subset_file(options.subset_file)
+        have_subsets = True
         
-        def sort_and_redraw():
-            taxa = list(mat.taxa)
-            def cells(tax):
-                return sum(mat.per_taxon_presence_absence[tax])
-            taxa.sort(key=cells, reverse=True)
-            mat.draw_matrix_graphic(matrix_canvas, taxa, 0, 0, matrix_canvas.winfo_reqwidth(), matrix_canvas.winfo_reqheight())
+        mat = CoverageMatrix()
+        mat.fill_from_subsets(subsets)
 
-        button = Button(matrix_canvas, text='SORT', command=sort_and_redraw)
-        matrix_canvas.create_window((0, 0), window=button, height=button.winfo_reqheight(), width=button.winfo_reqwidth(), anchor='nw')
+        loci_per_taxon =  mat.loci_per_taxon()
+        mat.calculate_statistics()
         
-    else:
-        out_trans = ['-', 'X']
-        for tax, cov in sorted(mat.per_taxon_presence_absence.items()):
-            sys.stderr.write('%30s\t%s\n' % (tax, ''.join([out_trans[c] for c in cov])))
-
-while True:
-    if options.build:
-        if not options.triplet_file:
-            sys.exit('triplet file (-t) must be supplied to make BUILD tree')
-        
-        build_tree = profile_wrapper(make_build_tree, prof, stdout_writer, options.triplet_file, messages=stderr_writer, verbose=options.verbose)
-       
-        if options.open_tree_viewer:
-            open_tree_viewer(tree_viewer_command, 'build.tre', build_tree)
-        
-    if options.strict:
-        if not options.triplet_file:
-            sys.exit('triplet file (-t) must be supplied to make strict consensus tree')
-        
-        use_threads = False
-        if use_threads and tk_gui:
-            #threading is sort of working here, but needs a lot more work
-            #tk_gui.progress_bar.start()
-
-            class ThreadedTask(threading.Thread):
-                def __init__(self, queue, func, *args, **kwargs):
-                    threading.Thread.__init__(self)
-                    self.queue = queue
-                    self.func = func
-                    self.args = args
-                    self.kwargs = kwargs
-                def run(self):
-                    result = self.func(*self.args, **self.kwargs)
-                    self.queue.put(result)
-
-            tk_gui.queue_thread(ThreadedTask(tk_gui.queue, make_strict_tree, stdout_writer, options.triplet_file, messages=stderr_writer, verbose=options.verbose))
-            tk_root.mainloop()
-            tk_root.mainloop()
-            strict_tree = tk_gui.result
+        if tk_root:
+            bar_canvas = results_window.add_canvas_pane(0, 1)
+            mat.draw_barplot(bar_canvas, loci_per_taxon, 0, 0, bar_canvas.winfo_reqwidth(), bar_canvas.winfo_reqheight())
             
-            #tk_gui.progress_bar.stop()
-        else: 
-            strict_tree = profile_wrapper(make_strict_tree, prof, stdout_writer, options.triplet_file, messages=stderr_writer, verbose=options.verbose)
-        
-        if options.open_tree_viewer:
-            open_tree_viewer(tree_viewer_command, 'strict.tre', strict_tree)
-        
-    if options.parents:
-        if not options.triplet_file:
-            sys.exit('triplet file (-t) must be supplied to count parent trees')
-        profile_wrapper(count_trees_on_terrace, prof, stdout_writer, options.triplet_file, messages=stderr_writer)
+            matrix_canvas = results_window.add_canvas_pane(1, 0, column_span=2)
+            mat.draw_matrix_graphic(matrix_canvas, mat.taxa, 0, 0, matrix_canvas.winfo_reqwidth(), matrix_canvas.winfo_reqheight())
+            
+            def sort_and_redraw():
+                taxa = list(mat.taxa)
+                def cells(tax):
+                    return sum(mat.per_taxon_presence_absence[tax])
+                taxa.sort(key=cells, reverse=True)
+                mat.draw_matrix_graphic(matrix_canvas, taxa, 0, 0, matrix_canvas.winfo_reqwidth(), matrix_canvas.winfo_reqheight())
+
+            button = Button(matrix_canvas, text='SORT', command=sort_and_redraw)
+            matrix_canvas.create_window((0, 0), window=button, height=button.winfo_reqheight(), width=button.winfo_reqwidth(), anchor='nw')
+            
+        else:
+            out_trans = ['-', 'X']
+            for tax, cov in sorted(mat.per_taxon_presence_absence.items()):
+                sys.stderr.write('%30s\t%s\n' % (tax, ''.join([out_trans[c] for c in cov])))
+
+    while True:
+        if options.build:
+            if not options.triplet_file:
+                sys.exit('triplet file (-t) must be supplied to make BUILD tree')
+            
+            build_tree = profile_wrapper(make_build_tree, prof, stdout_writer, options.triplet_file, messages=stderr_writer, verbose=options.verbose)
+           
+            if options.open_tree_viewer:
+                open_tree_viewer(tree_viewer_command, 'build.tre', build_tree)
+            
+        if options.strict:
+            if not options.triplet_file:
+                sys.exit('triplet file (-t) must be supplied to make strict consensus tree')
+            
+            use_threads = False
+            if use_threads and tk_gui:
+                #threading is sort of working here, but needs a lot more work
+                #tk_gui.progress_bar.start()
+
+                class ThreadedTask(threading.Thread):
+                    def __init__(self, queue, func, *args, **kwargs):
+                        threading.Thread.__init__(self)
+                        self.queue = queue
+                        self.func = func
+                        self.args = args
+                        self.kwargs = kwargs
+                    def run(self):
+                        result = self.func(*self.args, **self.kwargs)
+                        self.queue.put(result)
+
+                tk_gui.queue_thread(ThreadedTask(tk_gui.queue, make_strict_tree, stdout_writer, options.triplet_file, messages=stderr_writer, verbose=options.verbose))
+                tk_root.mainloop()
+                tk_root.mainloop()
+                strict_tree = tk_gui.result
+                
+                #tk_gui.progress_bar.stop()
+            else: 
+                strict_tree = profile_wrapper(make_strict_tree, prof, stdout_writer, options.triplet_file, messages=stderr_writer, verbose=options.verbose)
+            
+            if options.open_tree_viewer:
+                open_tree_viewer(tree_viewer_command, 'strict.tre', strict_tree)
+            
+        if options.parents:
+            if not options.triplet_file:
+                sys.exit('triplet file (-t) must be supplied to count parent trees')
+            profile_wrapper(count_trees_on_terrace, prof, stdout_writer, options.triplet_file, messages=stderr_writer)
+            if tk_root:
+                tk_root.mainloop()
+
+        '''
+        if options.generate_parents:
+            if not options.triplet_file:
+                sys.exit('triplet file (-t) must be supplied to count parent trees')
+            profile_wrapper(generate_trees_on_terrace, prof, stdout_writer, options.triplet_file, messages=stderr_writer)
+            if tk_root:
+                tk_root.mainloop()
+        '''
+
+        if options.list_terraces:
+            if not options.subset_file or not options.treefiles_to_assign:
+                sys.exit('must specify both subset file (-s) and --treefiles-to-assign to assign trees to terraces')
+            profile_wrapper(assign_to_terraces, prof, stdout_writer, options.treefiles_to_assign, options.subset_file, messages=stderr_writer)
+            #profile_wrapper(assign_to_terraces_using_hashes, prof, stdout_writer, options.treefiles_to_assign, options.subset_file, messages=stderr_writer)
+
         if tk_root:
             tk_root.mainloop()
-
-    '''
-    if options.generate_parents:
-        if not options.triplet_file:
-            sys.exit('triplet file (-t) must be supplied to count parent trees')
-        profile_wrapper(generate_trees_on_terrace, prof, stdout_writer, options.triplet_file, messages=stderr_writer)
-        if tk_root:
-            tk_root.mainloop()
-    '''
-
-    if options.list_terraces:
-        if not options.subset_file or not options.treefiles_to_assign:
-            sys.exit('must specify both subset file (-s) and --treefiles-to-assign to assign trees to terraces')
-        profile_wrapper(assign_to_terraces, prof, stdout_writer, options.treefiles_to_assign, options.subset_file, messages=stderr_writer)
-        #profile_wrapper(assign_to_terraces_using_hashes, prof, stdout_writer, options.treefiles_to_assign, options.subset_file, messages=stderr_writer)
-
-    if tk_root:
-        tk_root.mainloop()
-        #update the options namespace to match the current state of the gui
-        options = parser.parse_args(tk_gui.make_commandline_list())
-    else:
-        break
-
+            #update the options namespace to match the current state of the gui
+            options = parser.parse_args(tk_gui.make_commandline_list())
+        else:
+            break
+except KeyboardInterrupt:
+    print 'terminating profiling and attemping to output results '
+finally:
 if prof:
     output_profile(prof)
 
