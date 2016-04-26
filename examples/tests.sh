@@ -1,14 +1,19 @@
 #!/bin/bash
 
+DATA=Pyron
+#DATA=Bouchenak
+
 #input files
-INPUTDIR=input/Bouchenak/
+INPUTDIR=input/$DATA
 TREE=$INPUTDIR/bestTree.phy
 ALN=$INPUTDIR/aln.exported.nex 
 
-OUTDIR=output/
+#OUTDIR=output.$DATA
+OUTDIR=output.$DATA.test
 mkdir -p $OUTDIR
 
-PERLSCRIPTDIR=perlScripts/
+PERLSCRIPTDIR=_perlScripts/
+
 if [ -d "$PERLSCRIPTDIR" ];then
     $PERLSCRIPTDIR/parseNexusCharSetToDAV.pl -f $ALN > $OUTDIR/perlSubsets || exit
     $PERLSCRIPTDIR/displaysub.pl $TREE $OUTDIR/perlSubsets > $OUTDIR/perlSubtrees || exit
@@ -20,35 +25,61 @@ fi
 TERRAPHYDIR=../scripts/
 MAIN=$TERRAPHYDIR/terraphy.main.py
 
+
+SUBSETS=$OUTDIR/subsets
+SUBTREES=$OUTDIR/subtrees
+TRIPLETS=$OUTDIR/triplets
+
 #making the subsets currently takes a while in terraphy, so can copy over 
 #the perl version if desired
-#cp $OUTDIR/perlSubsets $OUTDIR/subsets
+#cp $OUTDIR/perlSubsets $SUBSETS
 
-if [ ! -e $OUTDIR/subsets ];then
+if [ ! -e $SUBSETS ];then
     echo SUBSETS
-    $MAIN --coverage --alignment-file $ALN > $OUTDIR/subsets || exit
+    $MAIN --coverage --alignment-file $ALN > $SUBSETS || exit
 fi
 
-rm -f $OUTDIR/subtrees $OUTDIR/triplets $OUTDIR/parents $OUTDIR/build.tre $OUTDIR/strict.tre
+#rm -f $SUBTREES TRIPLETS $OUTDIR/parents $OUTDIR/build.tre $OUTDIR/strict.tre
 
 echo SUBTREES
-$MAIN --display --parent-tree $TREE --subset-file $OUTDIR/subsets > $OUTDIR/subtrees || exit
+if [ ! -e $SUBTREES ];then
+    $MAIN --display --parent-tree $TREE --subset-file $SUBSETS > $SUBTREES || exit
+fi
 
 echo TRIPLETS
-$MAIN -t --subtree-file $OUTDIR/subtrees > $OUTDIR/triplets || exit
-#grep -v "[ ].*[ ].*[ ].*" temp >> $OUTDIR/triplets || exit
-#some giberish sometimes gets output to the stream
-perl -p -i -e 's/^.*1034h//g' $OUTDIR/triplets
+if [ ! -e TRIPLETS ];then
+    $MAIN -t --subtree-file $SUBTREES > TRIPLETS || exit
+    #grep -v "[ ].*[ ].*[ ].*" temp >> TRIPLETS || exit
+    #some giberish sometimes gets output to the stream
+    perl -p -i -e 's/^.*1034h//g' TRIPLETS
+fi
 
 echo PARENTS
-$MAIN --parents --triplet-file $OUTDIR/triplets > $OUTDIR/parentCount || exit
+if [ ! -e $OUTDIR/parentCount ];then
+    $MAIN --parents --triplet-file TRIPLETS > $OUTDIR/parentCount || exit
+fi
 
-echo BUILD
-$MAIN --build --triplet-file $OUTDIR/triplets > $OUTDIR/build.tre || exit
+echo GENERATE-PARENTS
+PARENTS=$OUTDIR/allParents.tre
+if [ ! -e $PARENTS ];then
+    $MAIN --generate-parents --triplet-file $TRIPLETS > $PARENTS || exit
+fi 
 
-echo BUILD
-$MAIN --strict --triplet-file $OUTDIR/triplets > $OUTDIR/strict.tre || exit
+
+BUILD=$OUTDIR/build.tre 
+if [ ! -e $BUILD ];then
+    echo BUILD
+    $MAIN --build --triplet-file TRIPLETS > $BUILD || exit
+fi
+
+
+STRICT=$OUTDIR/strict.tre 
+if [ ! -e $STRICT ];then
+    echo STRICT
+    $MAIN --strict --triplet-file TRIPLETS > $STRICT || exit
+fi
+
 
 echo TERRACES
-../scripts/terraphy.main.py --list-terraces --subset-file $OUTDIR/subsets --treefiles-to-assign $INPUTDIR/100pars.tre > $OUTDIR/terraceList
+../scripts/terraphy.main.py --list-terraces --subset-file $SUBSETS --treefiles-to-assign $INPUTDIR/100pars.tre > $OUTDIR/terraceList
 
