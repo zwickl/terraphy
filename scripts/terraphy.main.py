@@ -96,11 +96,11 @@ def profile_wrapper(func, profiler, *args, **kwargs):
     if profiler:
         profiler.enable()
     try:
-    result = func(*args, **kwargs)
+        result = func(*args, **kwargs)
     except KeyboardInterrupt:
         print 'terminating profiling'
-    if profiler:
-        profiler.disable()
+        if profiler:
+            profiler.disable()
         raise KeyboardInterrupt
     return result
 
@@ -644,22 +644,31 @@ def superb(label_set, triplets):
 
 
 def combine_subtrees(left_treelist, right_treelist):
-    subtrees = TreeList()
+
+    tns = left_treelist.taxon_namespace
+
+    if tns  is not right_treelist.taxon_namespace:
+        raise ValueError('treelists must have same namespaces')
+
+    subtrees = TreeList(taxon_namespace=tns)
     
-    for left in left_treelist:
-        #print '%s' % left
+    cn = 0
+    for ln, left in enumerate(left_treelist):
         assert(len(left.seed_node._child_nodes) == 1)
-        for right in right_treelist:
+        for rn, right in enumerate(right_treelist):
             assert(len(right.seed_node._child_nodes) == 1)
-            combined = Tree()
-            subtree_root = combined.seed_node.new_node()
-            subtree_root.add_child(left.seed_node._child_nodes[0])
-            subtree_root.add_child(right.seed_node._child_nodes[0])
+            combined = Tree(taxon_namespace=tns)
+            subtree_root = combined.seed_node.new_child()
+            subtree_root.set_child_nodes([left.seed_node._child_nodes[0], right.seed_node._child_nodes[0]])
+            #subtree_root.add_child(left.seed_node._child_nodes[0])
+            #subtree_root.add_child(right.seed_node._child_nodes[0])
             subtrees.append(combined)
-            #print '%s' % left, '%s' % right, '%s' % combined
+            cn +=1 
             assert(len(combined.seed_node._child_nodes) == 1)
-            #print '%s %s %s' % (left, right, combined)
+            #print '%d %s %d %s %d %s' % (ln, left, rn, right, cn, combined)
             #print combined.seed_node._parent_node
+            
+            '''this is just for debugging
             for n in combined.postorder_internal_node_iter():
                 if n._parent_node:
                     #print 'parent', n._parent_node, len(n._child_nodes)
@@ -667,9 +676,10 @@ def combine_subtrees(left_treelist, right_treelist):
                 else:
                     #print 'no parent', n._parent_node, len(n._child_nodes)
                     assert(len(n._child_nodes) == 1)
-    for stree in [left_treelist, right_treelist]:
-        for t in stree:
-            del t
+            '''
+    #for stree in [left_treelist, right_treelist]:
+    #    for t in stree:
+    #        del t
 
     return subtrees
 
@@ -677,8 +687,10 @@ def combine_subtrees(left_treelist, right_treelist):
 def generate_trees_on_terrace(out, triplet_file, messages=sys.stderr):
     label_set, triplets = read_triplet_file(triplet_file, messages=messages)
 
+    tns =  TaxonNamespace(label_set)
+    
     messages.write('Generating parent trees on terrace...\n')
-    parents = superb_generate_trees(label_set, triplets)
+    parents = superb_generate_trees(label_set, triplets, tns)
     num_par = len(parents)
 
     if isinstance(out, str):
@@ -686,26 +698,28 @@ def generate_trees_on_terrace(out, triplet_file, messages=sys.stderr):
     else:
         out_stream = out
 
-    for stree in parents:
-        if len(stree.seed_node._child_nodes) == 1:
-            stree.seed_node = stree.seed_node._child_nodes[0]
-        out_stream.write('%s;\n' % stree)
+    #supressing several tree features that we know won't apply to these trees sppeds up tree writing a bit
+    parents.write_to_stream(dest=out, schema='newick', suppress_edge_lengths=True, suppress_internal_node_labels=True, suppress_internal_taxon_labels=True, suppress_annotations=True, unquoted_underscores=True)
+    #parents.write_to_stream(dest=out, schema='nexus', suppress_edge_lengths=True, suppress_internal_node_labels=True, suppress_internal_taxon_labels=True, suppress_annotations=True, unquoted_underscores=True)
 
+    
     if messages:
         messages.write('%d trees on terrace\n' % num_par)
     
     return num_par, parents
 
-def three_taxon_subtrees(label_set):
-    subtrees = TreeList()
+def three_taxon_subtrees(label_set, tns):
+    subtrees = TreeList(taxon_namespace=tns)
     for out, in1, in2 in ([0, 1, 2], [1, 0, 2], [2, 0, 1]):
-        new_subtree = Tree()
+        new_subtree = Tree(taxon_namespace=tns)
         subtree_root = new_subtree.seed_node.new_child()
         subtree_root.add_child(Node(label=label_set[out]))
+        subtree_root.new_child(taxon=tns.require_taxon(label_set[out]))
         new_node = subtree_root.new_node()
 
-        new_node.add_child(Node(label=label_set[in1]))
-        new_node.add_child(Node(label=label_set[in2]))
+        new_node.set_child_nodes([tns.require_taxon(t) for t in [in1, in2]])
+        #new_node.new_child(Node(label=label_set[in1]))
+        #new_node.add_child(Node(label=label_set[in2]))
         #print '%s' % new_subtree
         assert(len(new_subtree.seed_node._child_nodes) == 1)
         subtrees.append(new_subtree)
@@ -721,7 +735,7 @@ def three_taxon_subtrees(label_set):
     return subtrees
 
 
-def generate_all_subtrees_for_label_set(label_set):
+def generate_all_subtrees_for_label_set(label_set, tns):
     label_set = list(label_set)
     
     treestr = '(%s, %s);' % (label_set[0], label_set[1])
@@ -730,23 +744,25 @@ def generate_all_subtrees_for_label_set(label_set):
     #one descendent - that is good, as it allows attaching a new leaf to that root edge
     last_level = TreeList.get_from_string(treestr, "newick", rooting='force-rooted')
 
+    #print 'generating subtrees for',  label_set
+
     for leaf in label_set[2:]:
-        this_level = TreeList()
+        this_level = TreeList(taxon_namespace=tns)
         for last in last_level:
             #print '%s' % last
             last.encode_bipartitions()
             
             for bip, edge in last.bipartition_edge_map.items():
-                new_tree = Tree(last)
+                new_tree = Tree(last, taxon_namespace=tns)
                 edge_to_bisect = new_tree.bipartition_edge_map[bip]
                 if edge_to_bisect.tail_node:
                     child = edge_to_bisect.head_node
                     parent = edge_to_bisect.tail_node
 
                     parent.remove_child(child)
-                    new_node = parent.add_child(new_tree.node_factory())
+                    new_node = parent.new_child()
                     new_node.add_child(child)
-                    new_node.add_child(new_tree.node_factory(taxon=Taxon(label=leaf)))
+                    new_node.new_child(taxon=tns.require_taxon(label=leaf))
                     #print '%s' % new_tree
 
                 else:
@@ -754,14 +770,14 @@ def generate_all_subtrees_for_label_set(label_set):
                     parent = new_tree.node_factory()
                     parent.add_child(child)
                     new_tree.seed_node = parent
-                    parent.add_child(new_tree.node_factory(taxon=Taxon(label=leaf)))
+                    parent.new_child(taxon=tns.require_taxon(label=leaf))
                     #print '%s root' % new_tree
 
                 n = new_tree.node_factory()
                 n.add_child(new_tree.seed_node)
                 new_tree.seed_node = n
 
-                new_tree.taxon_namespace = new_tree.update_taxon_namespace()
+                #new_tree.taxon_namespace = new_tree.update_taxon_namespace()
                 new_tree.encode_bipartitions()
                 this_level.append(new_tree)
 
@@ -780,17 +796,19 @@ def generate_all_subtrees_for_label_set(label_set):
     return last_level
 
 
-def superb_generate_trees(label_set, triplets):
+def superb_generate_trees(label_set, triplets, tns):
     '''SUPERB algorithm of Constantinescu and Sankoff, 1995, to generate parent trees
     compatible with given set of triplets'''
     
     #print len(label_set), sys.getsizeof(label_set)
+    #print label_set
 
     num_parents = 0
-    subtrees = TreeList()
+    subtrees = TreeList(taxon_namespace=tns)
     if not triplets:
         num_parents = num_trees(len(label_set))
-        subtrees.extend(generate_all_subtrees_for_label_set(label_set))
+        #subtrees.extend(generate_all_subtrees_for_label_set(label_set, tns))
+        subtrees._trees.extend(generate_all_subtrees_for_label_set(label_set, tns)._trees)
     else:
         components = compute(label_set, triplets)
         num_components = len(components)
@@ -800,51 +818,53 @@ def superb_generate_trees(label_set, triplets):
             for i in xrange(1, num_biparts + 1):
                 subset1, subset2 = create_bipartition(components, i, as_list=True)
 
-                left_subtrees = TreeList()
+                left_subtrees = TreeList(taxon_namespace=tns)
                 if len(subset1) == 1:
                     q = 1
-                    new_subtree = Tree()
+                    new_subtree = Tree(taxon_namespace=tns)
                     subtree_root = new_subtree.seed_node
-                    subtree_root.add_child(new_subtree.node_factory(taxon=Taxon(label=subset1[0])))
+                    subtree_root.new_child(taxon=tns.require_taxon(label=subset1[0]))
 
                     left_subtrees.append(new_subtree)
 
                 elif len(subset1) == 2:
                     q = 1
-                    new_subtree = Tree()
-                    subtree_root = new_subtree.seed_node.add_child(new_subtree.node_factory())
+                    new_subtree = Tree(taxon_namespace=tns)
+                    subtree_root = new_subtree.seed_node.new_child()
                     for el in subset1:
-                        subtree_root.add_child(new_subtree.node_factory(taxon=Taxon(label=el)))
+                        subtree_root.new_child(taxon=tns.require_taxon(label=el))
                     left_subtrees.append(new_subtree)
                 else:
                     new_triplets = winnow_triplets(subset1, triplets)
-                    q = superb(subset1, new_triplets)
-                    left_subtrees.extend(superb_generate_trees(subset1, new_triplets))
+                    #q = superb(subset1, new_triplets)
+                    #left_subtrees.extend(superb_generate_trees(subset1, new_triplets, tns))
+                    left_subtrees._trees.extend(superb_generate_trees(subset1, new_triplets, tns)._trees)
 
-                right_subtrees = TreeList()
+                right_subtrees = TreeList(taxon_namespace=tns)
                 if len(subset2) == 1:
                     v = 1
-                    new_subtree = Tree()
+                    new_subtree = Tree(taxon_namespace=tns)
                     subtree_root = new_subtree.seed_node
-                    subtree_root.add_child(new_subtree.node_factory(taxon=Taxon(label=subset2[0])))
+                    subtree_root.new_child(taxon=tns.require_taxon(label=subset2[0]))
                     right_subtrees.append(new_subtree)
                 elif len(subset2) == 2:
                     v = 1
-                    new_subtree = Tree()
-                    subtree_root = new_subtree.seed_node.add_child(new_subtree.node_factory())
+                    new_subtree = Tree(taxon_namespace=tns)
+                    subtree_root = new_subtree.seed_node.new_child()
                     for el in subset2:
-                        subtree_root.add_child(new_subtree.node_factory(taxon=Taxon(label=el)))
+                        subtree_root.new_child(taxon=tns.require_taxon(label=el))
                     right_subtrees.append(new_subtree)
                 else:
                     new_triplets = winnow_triplets(subset2, triplets)
-                    v = superb(subset2, new_triplets)
-                    right_subtrees.extend(superb_generate_trees(subset2, new_triplets))
+                    #v = superb(subset2, new_triplets)
+                    #right_subtrees.extend(superb_generate_trees(subset2, new_triplets, tns))
+                    right_subtrees._trees.extend(superb_generate_trees(subset2, new_triplets, tns)._trees)
 
-                assert(q == len(left_subtrees))
-                assert(v == len(right_subtrees))
+                #assert(q == len(left_subtrees))
+                #assert(v == len(right_subtrees))
 
-                num_parents += q * v
-                subtrees.extend(combine_subtrees(left_subtrees, right_subtrees))
+                num_parents += len(left_subtrees) * len(right_subtrees)
+                subtrees._trees.extend(combine_subtrees(left_subtrees, right_subtrees)._trees)
 
                 #del subset1
                 #del subset2
@@ -1355,7 +1375,7 @@ analyses = parser.add_argument_group('Analyses to be performed on files created 
 analyses.add_argument('-p', '--parents', action='store_true', default=False, help='compute the number of parent trees given a triplets file (requires --triplet-file')
 
 #not implemented yet
-#analyses.add_argument('--generate-parents', action='store_true', default=False, help='compute the number of parent trees given a triplets file (requires --triplet-file')
+analyses.add_argument('--generate-parents', action='store_true', default=False, help='generate compatible parent trees given a triplets file (requires --triplet-file')
 
 analyses.add_argument('-b', '--build', action='store_true', default=False, help='compute the BUILD tree from a triplet file (requires --triplet-file)')
 
@@ -1578,14 +1598,12 @@ try:
             if tk_root:
                 tk_root.mainloop()
 
-        '''
         if options.generate_parents:
             if not options.triplet_file:
                 sys.exit('triplet file (-t) must be supplied to count parent trees')
             profile_wrapper(generate_trees_on_terrace, prof, stdout_writer, options.triplet_file, messages=stderr_writer)
             if tk_root:
                 tk_root.mainloop()
-        '''
 
         if options.list_terraces:
             if not options.subset_file or not options.treefiles_to_assign:
@@ -1602,7 +1620,7 @@ try:
 except KeyboardInterrupt:
     print 'terminating profiling and attemping to output results '
 finally:
-if prof:
-    output_profile(prof)
+    if prof:
+        output_profile(prof)
 
 
