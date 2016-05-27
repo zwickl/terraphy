@@ -769,13 +769,16 @@ def generate_all_subtrees_for_label_set(label_set, tns):
 
 def superb_generate_parents(label_set, triplets, tns):
     '''SUPERB algorithm of Constantinescu and Sankoff, 1995, to generate parent trees
-    compatible with given set of triplets'''
+    compatible with given set of triplets
+    Important to explicitly ensure that all TreeLIsts have same TaxonNamespaces
+    Interacting directly with the underlying TreeList._trees container is often faster than with 
+    TreeLists themselves, which are often deepcopied for no obvious reason
+    '''
 
     num_parents = 0
     subtrees = TreeList(taxon_namespace=tns)
     if not triplets:
         num_parents = num_trees(len(label_set))
-        #subtrees.extend(generate_all_subtrees_for_label_set(label_set, tns))
         subtrees._trees.extend(generate_all_subtrees_for_label_set(label_set, tns)._trees)
     else:
         components = compute(label_set, triplets)
@@ -784,54 +787,33 @@ def superb_generate_parents(label_set, triplets, tns):
         if num_components > 1:
             num_biparts = 2 ** (num_components - 1) - 1
             for i in xrange(1, num_biparts + 1):
-                subset1, subset2 = create_bipartition(components, i, as_list=True)
 
-                left_subtrees = TreeList(taxon_namespace=tns)
-                if len(subset1) == 1:
-                    q = 1
-                    new_subtree = Tree(taxon_namespace=tns)
-                    subtree_root = new_subtree.seed_node
-                    subtree_root.new_child(taxon=tns.require_taxon(label=subset1[0]))
+                subtree_lists = []
+                for subs in create_bipartition(components, i, as_list=True):
+                    this_list = TreeList(taxon_namespace=tns)
+                    if len(subs) <= 2:
+                        new_subtree = Tree(taxon_namespace=tns)
 
-                    left_subtrees.append(new_subtree)
+                        #this is done slightly differently if adding a leaf or cherry
+                        if len(subs) == 1:
+                            subtree_root = new_subtree.seed_node
+                        else:
+                            subtree_root = new_subtree.seed_node.new_child()
 
-                elif len(subset1) == 2:
-                    q = 1
-                    new_subtree = Tree(taxon_namespace=tns)
-                    subtree_root = new_subtree.seed_node.new_child()
-                    for el in subset1:
-                        subtree_root.new_child(taxon=tns.require_taxon(label=el))
-                    left_subtrees.append(new_subtree)
-                else:
-                    new_triplets = winnow_triplets(subset1, triplets)
-                    left_subtrees._trees.extend(superb_generate_parents(subset1, new_triplets, tns)._trees)
-
-                right_subtrees = TreeList(taxon_namespace=tns)
-                if len(subset2) == 1:
-                    v = 1
-                    new_subtree = Tree(taxon_namespace=tns)
-                    subtree_root = new_subtree.seed_node
-                    subtree_root.new_child(taxon=tns.require_taxon(label=subset2[0]))
-                    right_subtrees.append(new_subtree)
-                elif len(subset2) == 2:
-                    v = 1
-                    new_subtree = Tree(taxon_namespace=tns)
-                    subtree_root = new_subtree.seed_node.new_child()
-                    for el in subset2:
-                        subtree_root.new_child(taxon=tns.require_taxon(label=el))
-                    right_subtrees.append(new_subtree)
-                else:
-                    new_triplets = winnow_triplets(subset2, triplets)
-                    right_subtrees._trees.extend(superb_generate_parents(subset2, new_triplets, tns)._trees)
-
-                #assert(q == len(left_subtrees))
-                #assert(v == len(right_subtrees))
+                        for el in subs:
+                            subtree_root.new_child(taxon=tns.require_taxon(label=el))
+                        this_list.append(new_subtree)
+                   
+                    else:
+                        new_triplets = winnow_triplets(subs, triplets)
+                        this_list._trees.extend(superb_generate_parents(subs, new_triplets, tns)._trees)
+                    
+                    subtree_lists.append(this_list)
+                
+                left_subtrees, right_subtrees = subtree_lists[0], subtree_lists[1]
 
                 num_parents += len(left_subtrees) * len(right_subtrees)
                 subtrees._trees.extend(combine_subtrees(left_subtrees, right_subtrees)._trees)
-
-                #del subset1
-                #del subset2
 
         else:
             assert(0)
@@ -1022,9 +1004,10 @@ def print_subsets(out, infile, messages=sys.stderr):
         out_stream = open(out, 'w')
     else:
         out_stream = out
-    for taxon in mat.taxon_set:
+    for taxon in mat.taxon_namespace:
         presence_absence[taxon] = []
-        seq = mat.taxon_seq_map[taxon]
+        #seq = mat.taxon_seq_map[taxon]
+        seq = mat[taxon]
 
         for subset_indeces in char_subsets:
             for index in subset_indeces:
