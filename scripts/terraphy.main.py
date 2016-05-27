@@ -595,8 +595,8 @@ def compute_comp_dict(label_set, triplets, comp_dict, verbose=False, level=1):
 def count_trees_on_terrace(out, triplet_file, messages=sys.stderr):
     label_set, triplets = read_triplet_file(triplet_file, messages=messages)
 
-    messages.write('Calculating parent trees on terrace...\n')
-    num_par = superb(label_set, triplets)
+    messages.write('Counting parent trees on terrace...\n')
+    num_par = superb_count_parents(label_set, triplets)
 
     if out:
         if isinstance(out, str):
@@ -608,9 +608,11 @@ def count_trees_on_terrace(out, triplet_file, messages=sys.stderr):
     return num_par
 
 
-def superb(label_set, triplets):
-    '''SUPERB algorithm of Constantinescu and Sankoff, 1995, to count number of parent trees
-    compatible with given set of triplets'''
+def superb_count_parents(label_set, triplets):
+    '''SUPERB algorithm of Constantinescu and Sankoff, 1995, 
+    adapted to to count (instead of generate) parent trees compatible 
+    with given set of triplets
+    '''
     num_parents = 0
     if not triplets:
         num_parents = num_trees(len(label_set))
@@ -627,13 +629,13 @@ def superb(label_set, triplets):
                     q = 1
                 else:
                     new_triplets = winnow_triplets(subset1, triplets)
-                    q = superb(subset1, new_triplets)
+                    q = superb_count_parents(subset1, new_triplets)
 
                 if len(subset2) <= 2:
                     v = 1
                 else:
                     new_triplets = winnow_triplets(subset2, triplets)
-                    v = superb(subset2, new_triplets)
+                    v = superb_count_parents(subset2, new_triplets)
 
                 num_parents += q * v
 
@@ -682,7 +684,7 @@ def generate_trees_on_terrace(out, triplet_file, messages=sys.stderr):
     tns =  TaxonNamespace(label_set)
     
     messages.write('Generating parent trees on terrace...\n')
-    parents = superb_generate_trees(label_set, triplets, tns)
+    parents = superb_generate_parents(label_set, triplets, tns)
     num_par = len(parents)
 
     if isinstance(out, str):
@@ -699,34 +701,6 @@ def generate_trees_on_terrace(out, triplet_file, messages=sys.stderr):
         messages.write('generated %d trees on terrace\n' % num_par)
     
     return num_par, parents
-
-
-def three_taxon_subtrees(label_set, tns):
-    '''Special case of generate_all_subtrees_for_label_set for three leaves'''
-    subtrees = TreeList(taxon_namespace=tns)
-    for out, in1, in2 in ([0, 1, 2], [1, 0, 2], [2, 0, 1]):
-        new_subtree = Tree(taxon_namespace=tns)
-        subtree_root = new_subtree.seed_node.new_child()
-        subtree_root.add_child(Node(label=label_set[out]))
-        subtree_root.new_child(taxon=tns.require_taxon(label_set[out]))
-        new_node = subtree_root.new_node()
-
-        new_node.set_child_nodes([tns.require_taxon(t) for t in [in1, in2]])
-        #new_node.new_child(Node(label=label_set[in1]))
-        #new_node.add_child(Node(label=label_set[in2]))
-        #print '%s' % new_subtree
-        assert(len(new_subtree.seed_node._child_nodes) == 1)
-        subtrees.append(new_subtree)
-        
-        for n in new_subtree.postorder_internal_node_iter():
-            if n._parent_node:
-                #print 'parent', n._parent_node, len(n._child_nodes)
-                assert(len(n._child_nodes) == 2)
-            else:
-                #print 'no parent', n._parent_node, len(n._child_nodes)
-                assert(len(n._child_nodes) == 1)
-   
-    return subtrees
 
 
 def generate_all_subtrees_for_label_set(label_set, tns):
@@ -793,7 +767,7 @@ def generate_all_subtrees_for_label_set(label_set, tns):
     return last_level
 
 
-def superb_generate_trees(label_set, triplets, tns):
+def superb_generate_parents(label_set, triplets, tns):
     '''SUPERB algorithm of Constantinescu and Sankoff, 1995, to generate parent trees
     compatible with given set of triplets'''
 
@@ -830,9 +804,7 @@ def superb_generate_trees(label_set, triplets, tns):
                     left_subtrees.append(new_subtree)
                 else:
                     new_triplets = winnow_triplets(subset1, triplets)
-                    #q = superb(subset1, new_triplets)
-                    #left_subtrees.extend(superb_generate_trees(subset1, new_triplets, tns))
-                    left_subtrees._trees.extend(superb_generate_trees(subset1, new_triplets, tns)._trees)
+                    left_subtrees._trees.extend(superb_generate_parents(subset1, new_triplets, tns)._trees)
 
                 right_subtrees = TreeList(taxon_namespace=tns)
                 if len(subset2) == 1:
@@ -850,9 +822,7 @@ def superb_generate_trees(label_set, triplets, tns):
                     right_subtrees.append(new_subtree)
                 else:
                     new_triplets = winnow_triplets(subset2, triplets)
-                    #v = superb(subset2, new_triplets)
-                    #right_subtrees.extend(superb_generate_trees(subset2, new_triplets, tns))
-                    right_subtrees._trees.extend(superb_generate_trees(subset2, new_triplets, tns)._trees)
+                    right_subtrees._trees.extend(superb_generate_parents(subset2, new_triplets, tns)._trees)
 
                 #assert(q == len(left_subtrees))
                 #assert(v == len(right_subtrees))
@@ -862,7 +832,6 @@ def superb_generate_trees(label_set, triplets, tns):
 
                 #del subset1
                 #del subset2
-
 
         else:
             assert(0)
