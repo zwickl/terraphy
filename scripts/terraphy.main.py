@@ -644,6 +644,9 @@ def superb(label_set, triplets):
 
 
 def combine_subtrees(left_treelist, right_treelist):
+    '''Return TreeList containing all combinations of left and right
+    subtrees from passed TreeLists
+    '''
 
     tns = left_treelist.taxon_namespace
 
@@ -660,23 +663,12 @@ def combine_subtrees(left_treelist, right_treelist):
             combined = Tree(taxon_namespace=tns)
             subtree_root = combined.seed_node.new_child()
             subtree_root.set_child_nodes([left.seed_node._child_nodes[0], right.seed_node._child_nodes[0]])
-            #subtree_root.add_child(left.seed_node._child_nodes[0])
-            #subtree_root.add_child(right.seed_node._child_nodes[0])
             subtrees.append(combined)
             cn +=1 
             assert(len(combined.seed_node._child_nodes) == 1)
             #print '%d %s %d %s %d %s' % (ln, left, rn, right, cn, combined)
             #print combined.seed_node._parent_node
             
-            '''this is just for debugging
-            for n in combined.postorder_internal_node_iter():
-                if n._parent_node:
-                    #print 'parent', n._parent_node, len(n._child_nodes)
-                    assert(len(n._child_nodes) == 2)
-                else:
-                    #print 'no parent', n._parent_node, len(n._child_nodes)
-                    assert(len(n._child_nodes) == 1)
-            '''
     #for stree in [left_treelist, right_treelist]:
     #    for t in stree:
     #        del t
@@ -708,7 +700,9 @@ def generate_trees_on_terrace(out, triplet_file, messages=sys.stderr):
     
     return num_par, parents
 
+
 def three_taxon_subtrees(label_set, tns):
+    '''Special case of generate_all_subtrees_for_label_set for three leaves'''
     subtrees = TreeList(taxon_namespace=tns)
     for out, in1, in2 in ([0, 1, 2], [1, 0, 2], [2, 0, 1]):
         new_subtree = Tree(taxon_namespace=tns)
@@ -736,6 +730,9 @@ def three_taxon_subtrees(label_set, tns):
 
 
 def generate_all_subtrees_for_label_set(label_set, tns):
+    '''Generate all possible (rooted) trees for the label_set
+    Essentially works by successive stepwise addition.
+    '''
     label_set = list(label_set)
     
     treestr = '(%s, %s);' % (label_set[0], label_set[1])
@@ -799,9 +796,6 @@ def generate_all_subtrees_for_label_set(label_set, tns):
 def superb_generate_trees(label_set, triplets, tns):
     '''SUPERB algorithm of Constantinescu and Sankoff, 1995, to generate parent trees
     compatible with given set of triplets'''
-    
-    #print len(label_set), sys.getsizeof(label_set)
-    #print label_set
 
     num_parents = 0
     subtrees = TreeList(taxon_namespace=tns)
@@ -870,18 +864,6 @@ def superb_generate_trees(label_set, triplets, tns):
                 #del subset2
 
 
-            '''
-            if len(label_set) > 100:
-                import gc
-                with open('objects', 'w') as obj:
-                    for item in gc.get_objects():
-                        size = sys.getsizeof(item)
-                        if size > 1024:
-                            obj.write('%d\t%s\t%s\n' % (sys.getsizeof(item), type(item), item))
-                        else:
-                            obj.write('%d\t%s\n' % (sys.getsizeof(item), type(item)))
-                exit()
-            '''
         else:
             assert(0)
 
@@ -1374,7 +1356,6 @@ analyses = parser.add_argument_group('Analyses to be performed on files created 
 
 analyses.add_argument('-p', '--parents', action='store_true', default=False, help='compute the number of parent trees given a triplets file (requires --triplet-file')
 
-#not implemented yet
 analyses.add_argument('--generate-parents', action='store_true', default=False, help='generate compatible parent trees given a triplets file (requires --triplet-file')
 
 analyses.add_argument('-b', '--build', action='store_true', default=False, help='compute the BUILD tree from a triplet file (requires --triplet-file)')
