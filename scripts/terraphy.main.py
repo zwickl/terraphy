@@ -696,7 +696,7 @@ def generate_trees_on_terrace(out, triplet_file, messages=sys.stderr):
 
     
     if messages:
-        messages.write('%d trees on terrace\n' % num_par)
+        messages.write('generated %d trees on terrace\n' % num_par)
     
     return num_par, parents
 
@@ -1292,6 +1292,7 @@ def assign_to_terraces_using_hashes(out, treefiles, subset_file, messages=sys.st
         out_stream.write('\t%d\t%d\n' %  (n +1 , s))
     out_stream.write('%d terraces found\n' % len(terrace_size))
 
+
 def num_trees(taxa):
     '''The number of tree topologies for the given number of taxa'''
     trees = 0
@@ -1581,7 +1582,7 @@ try:
 
         if options.generate_parents:
             if not options.triplet_file:
-                sys.exit('triplet file (-t) must be supplied to count parent trees')
+                sys.exit('triplet file (-t) must be supplied to generate parent trees')
             profile_wrapper(generate_trees_on_terrace, prof, stdout_writer, options.triplet_file, messages=stderr_writer)
             if tk_root:
                 tk_root.mainloop()
@@ -1598,6 +1599,7 @@ try:
             options = parser.parse_args(tk_gui.make_commandline_list())
         else:
             break
+
 except KeyboardInterrupt:
     print 'terminating profiling and attemping to output results '
 finally:
