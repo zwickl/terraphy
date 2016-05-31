@@ -946,55 +946,36 @@ def superb_generate_master_sampling_tree(label_set, triplets, tns):
         if num_components > 1:
 
             num_biparts = 2 ** (num_components - 1) - 1
-            #each pass through this loop generates a pair consisting of (non-independednt) left/right subtree options
             for i in xrange(1, num_biparts + 1):
+            #each pass through this loop generates a pair consisting of (non-independednt) left/right subtree options
 
-                subset1, subset2 = create_bipartition(components, i, as_list=True)
+                sides = []
+                for subs in create_bipartition(components, i, as_list=True):
+                    this_side = RandomSelectionNode(tns)
 
-                left_node = RandomSelectionNode(tns)
-                if len(subset1) == 1:
-                    q = 1
+                    if len(subs) <= 2:
                     new_subtree = Tree(taxon_namespace=tns)
-                    subtree_root = new_subtree.seed_node
-                    subtree_root.new_child(taxon=tns.require_taxon(label=subset1[0]))
 
-                    left_node.subtrees._trees.append(new_subtree)
-                    #print 'left leaf', subset1[0]
 
-                elif len(subset1) == 2:
-                    q = 1
-                    new_subtree = Tree(taxon_namespace=tns)
+                        #this is done slightly differently if adding a leaf or cherry
+                        if len(subs) == 1:
+                            subtree_root = new_subtree.seed_node
+                        else:
                     subtree_root = new_subtree.seed_node.new_child()
-                    for el in subset1:
+
+                        for el in subs:
                         subtree_root.new_child(taxon=tns.require_taxon(label=el))
                     
-                    left_node.subtrees._trees.append(new_subtree)
+                       
+                        this_side.subtrees._trees.append(new_subtree)
                 else:
-                    new_triplets = winnow_triplets(subset1, triplets)
-                    left_node = superb_generate_master_sampling_tree(subset1, new_triplets, tns)
+                        new_triplets = winnow_triplets(subs, triplets)
+                        this_side = superb_generate_master_sampling_tree(subs, new_triplets, tns)
 
+                    sides.append(this_side)
 
-                right_node = RandomSelectionNode(tns)
-                if len(subset2) == 1:
-                    v = 1
-                    new_subtree = Tree(taxon_namespace=tns)
-                    subtree_root = new_subtree.seed_node
-                    subtree_root.new_child(taxon=tns.require_taxon(label=subset2[0]))
+                left_node, right_node = sides[0], sides[1]
                     
-                    right_node.subtrees.append(new_subtree)
-                    
-                elif len(subset2) == 2:
-                    v = 1
-                    new_subtree = Tree(taxon_namespace=tns)
-                    subtree_root = new_subtree.seed_node.new_child()
-                    for el in subset2:
-                        subtree_root.new_child(taxon=tns.require_taxon(label=el))
-                    
-                    right_node.subtrees.append(new_subtree)
-                else:
-                    new_triplets = winnow_triplets(subset2, triplets)
-                    right_node = superb_generate_master_sampling_tree(subset2, new_triplets, tns)
-
                 this_node.left_right_pairs.append((left_node, right_node))
 
     return this_node
