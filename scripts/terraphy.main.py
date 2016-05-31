@@ -7,7 +7,7 @@ import shlex
 import threading
 from argparse import ArgumentParser
 from itertools import izip, combinations
-from random import sample, random
+from random import sample, random, choice
 from collections import Iterable
 from copy import deepcopy
 
@@ -821,6 +821,184 @@ def superb_generate_parents(label_set, triplets, tns):
     return subtrees
 
 
+class RandomSelectionNode(object):
+    '''
+    Terminal Nodes will have only a TreeList of fully resolved subtrees
+    for now internal nodes will have only left and right child nodes
+    '''
+
+    def __init__(self, tns):
+        self.subtrees = TreeList(taxon_namespace=tns)
+        self.left_right_pairs = []
+
+    def choose(self):
+
+        if self.subtrees:
+
+            sub = choice(self.subtrees)
+            ret = TreeList(taxon_namespace=self.subtrees.taxon_namespace)
+            ret._trees.append(sub)
+            return ret
+        else:
+            left_node, right_node = choice(self.left_right_pairs)
+
+
+            left_subtree = left_node.choose()
+            right_subtree  = right_node.choose()
+
+            #return a treelist here, or select a tree?
+            comb = combine_subtrees(left_subtree, right_subtree)
+            #print 'comb', type(comb)
+            return comb
+
+    def debug_print(self):
+        print 'debprint'
+        if self.subtrees:
+            print 'self.subtrees'
+            self.subtrees.write_to_stream(dest=sys.stdout, schema='newick', suppress_edge_lengths=True, suppress_internal_node_labels=True, suppress_internal_taxon_labels=True, suppress_annotations=True, unquoted_underscores=True)
+        else:
+            print '%d pairs' % len(self.left_right_pairs)
+            for num, (r, l) in enumerate(self.left_right_pairs):
+                print 'l%s' %num
+                l.debug_print()
+                print 'r%s' % num
+                r.debug_print()
+
+def sample_trees_on_terrace(num, out, triplet_file, messages=sys.stderr):
+    label_set, triplets = read_triplet_file(triplet_file, messages=messages)
+
+    tns =  TaxonNamespace(label_set)
+    
+    messages.write('Sampling %d  parent trees on terrace...\n' % num)
+
+    #base_node = RandomSelectionNode()
+    #superb_generate_master_sampling_tree(base_node, label_set, triplets, tns)
+    #root = superb_generate_master_sampling_tree(label_set, triplets, tns)
+    root = superb_generate_master_sampling_tree(label_set, triplets, tns)
+
+
+    #root.debug_print()
+
+    parents = TreeList(taxon_namespace=tns)
+    for _ in xrange(num):
+
+        p = root.choose()
+        #parents.extend(p)
+        parents._trees.extend(p._trees)
+       
+        '''
+        p = root.choose()[0]
+        for t in parents:
+            if not same_tree(t, p):
+                parents.append(p)
+        '''
+
+    #print type(root)
+    #print type(parents)
+
+    if isinstance(out, str):
+        out_stream = open(out, 'wb') 
+    else:
+        out_stream = out
+
+    #supressing several tree features that we know won't apply to these trees sppeds up tree writing a bit
+    
+    parents.write_to_stream(dest=out, schema='newick', suppress_edge_lengths=True, suppress_internal_node_labels=True, suppress_internal_taxon_labels=True, suppress_annotations=True, unquoted_underscores=True)
+    
+    #parents.write_to_stream(dest=out, schema='nexus', suppress_edge_lengths=True, suppress_internal_node_labels=True, suppress_internal_taxon_labels=True, suppress_annotations=True, unquoted_underscores=True)
+
+    messages.write(' done.\n')
+    #return num_par, parents
+
+
+def superb_generate_master_sampling_tree(label_set, triplets, tns):
+    '''adaptation of SUPERB algorithm of Constantinescu and Sankoff, 1995, to generate parent trees
+    compatible with given set of triplets
+    Progresses through the normal SUPERB process, essentially caching alternative subtrees along the way 
+    using my RandomSelectionNode class.  REturns a single 'master_sampling_tree' which is then recursively traversed
+    by the RandomSelectionNode.choose function, randomly picking from the precomputed subtrees along the way. 
+    '''
+    
+    num_parents = 0
+    
+    sample_nodes_list = []    
+    #this_node is what it sounds like. It will either contain a number of raw subtrees (if it is near a tip)
+    #or a list of pairs of left/right nodes,  representing possible (non-independednt) resolutions of the left and right subtrees
+    #it is what is returned by  the function
+    this_node =  RandomSelectionNode(tns)
+    
+
+    if not triplets:
+        num_parents = num_trees(len(label_set))
+        
+        #extend directly, not two separate extends
+        #subtrees._trees.extend(generate_all_subtrees_for_label_set(label_set, tns)._trees)
+        #print 'genall', label_set
+        this_node.subtrees._trees.extend(generate_all_subtrees_for_label_set(label_set, tns)._trees)
+
+    else:
+        components = compute(label_set, triplets)
+        num_components = len(components)
+       
+        #DEBUG
+        #print 'components', components
+        
+        if num_components > 1:
+
+            num_biparts = 2 ** (num_components - 1) - 1
+            #each pass through this loop generates a pair consisting of (non-independednt) left/right subtree options
+            for i in xrange(1, num_biparts + 1):
+
+                subset1, subset2 = create_bipartition(components, i, as_list=True)
+
+                left_node = RandomSelectionNode(tns)
+                if len(subset1) == 1:
+                    q = 1
+                    new_subtree = Tree(taxon_namespace=tns)
+                    subtree_root = new_subtree.seed_node
+                    subtree_root.new_child(taxon=tns.require_taxon(label=subset1[0]))
+
+                    left_node.subtrees._trees.append(new_subtree)
+                    #print 'left leaf', subset1[0]
+
+                elif len(subset1) == 2:
+                    q = 1
+                    new_subtree = Tree(taxon_namespace=tns)
+                    subtree_root = new_subtree.seed_node.new_child()
+                    for el in subset1:
+                        subtree_root.new_child(taxon=tns.require_taxon(label=el))
+                    
+                    left_node.subtrees._trees.append(new_subtree)
+                else:
+                    new_triplets = winnow_triplets(subset1, triplets)
+                    left_node = superb_generate_master_sampling_tree(subset1, new_triplets, tns)
+
+
+                right_node = RandomSelectionNode(tns)
+                if len(subset2) == 1:
+                    v = 1
+                    new_subtree = Tree(taxon_namespace=tns)
+                    subtree_root = new_subtree.seed_node
+                    subtree_root.new_child(taxon=tns.require_taxon(label=subset2[0]))
+                    
+                    right_node.subtrees.append(new_subtree)
+                    
+                elif len(subset2) == 2:
+                    v = 1
+                    new_subtree = Tree(taxon_namespace=tns)
+                    subtree_root = new_subtree.seed_node.new_child()
+                    for el in subset2:
+                        subtree_root.new_child(taxon=tns.require_taxon(label=el))
+                    
+                    right_node.subtrees.append(new_subtree)
+                else:
+                    new_triplets = winnow_triplets(subset2, triplets)
+                    right_node = superb_generate_master_sampling_tree(subset2, new_triplets, tns)
+
+                this_node.left_right_pairs.append((left_node, right_node))
+
+    return this_node
+
 def create_bipartition(components, nth, as_list=False):
     '''Take the components in the existing partition and divide them into two groups, 
     creating a biparition.  nth is an index that arbitarily generates one of the possible 
@@ -1186,7 +1364,7 @@ def assign_to_terraces(out, treefiles, subset_file, messages=sys.stderr):
             terrace_size[len(terrace_subtree_list)] = 1
             terrace_subtree_list.append(this_tree_subtrees)
 
-    messages.write(' done.')
+    messages.write(' done\n.')
     out_stream.write('terrace sizes:\n\tterrace\t#assigned\n')
     for n, s in terrace_size.items():
         out_stream.write('\t%d\t%d\n' %  (n+1, s))
@@ -1238,7 +1416,7 @@ def assign_to_terraces_using_hashes(out, treefiles, subset_file, messages=sys.st
             terrace_size[len(terrace_subtree_list)] = 1
             terrace_subtree_list.append(this_tree_subtrees)
 
-    messages.write(' done.')
+    messages.write(' done.\n')
     out_stream.write('terrace sizes:\n\tterrace\t#assigned\n')
     for n, s in terrace_size.items():
         out_stream.write('\t%d\t%d\n' %  (n +1 , s))
@@ -1310,6 +1488,8 @@ analyses = parser.add_argument_group('Analyses to be performed on files created 
 analyses.add_argument('-p', '--parents', action='store_true', default=False, help='compute the number of parent trees given a triplets file (requires --triplet-file')
 
 analyses.add_argument('--generate-parents', action='store_true', default=False, help='generate compatible parent trees given a triplets file (requires --triplet-file')
+
+analyses.add_argument('--sample-parents', default=0, type=int, help='sample indicated number of  parent trees given a triplets file (requires --triplet-file')
 
 analyses.add_argument('-b', '--build', action='store_true', default=False, help='compute the BUILD tree from a triplet file (requires --triplet-file)')
 
@@ -1539,6 +1719,13 @@ try:
             if tk_root:
                 tk_root.mainloop()
 
+        if options.sample_parents:
+            if not options.triplet_file:
+                sys.exit('triplet file (-t) must be supplied to sample parent trees')
+            profile_wrapper(sample_trees_on_terrace, prof, options.sample_parents, stdout_writer, options.triplet_file, messages=stderr_writer)
+            if tk_root:
+                tk_root.mainloop()
+        
         if options.list_terraces:
             if not options.subset_file or not options.treefiles_to_assign:
                 sys.exit('must specify both subset file (-s) and --treefiles-to-assign to assign trees to terraces')
