@@ -1251,6 +1251,13 @@ def print_displayed_subtrees(out, trees, subsets, messages=sys.stderr):
         #taxon_label_map = { taxon.label:taxon for taxon in compat_get_taxon_set(tree) }
         taxon_label_map = { taxon.label:taxon for taxon in tree.taxon_namespace }
 
+
+        #allow interpretation of underscores as spaces in taxon names as well
+        #things can get complicated when input from various files differs in taxon labels
+        alt = {re.sub(' ', '_', lab):tax for lab, tax in taxon_label_map.items()}
+
+        taxon_label_map.update(alt)
+
         for setnum, retain in enumerate(subsets):
             messages.write('pruning tree %d to taxon set %d\n' % (tnum, setnum))
             newtree = displayed_subtree(tree, [ taxon_label_map[t] for t in retain ])

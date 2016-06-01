@@ -4,7 +4,7 @@ import os
 
 #DENDROPY PACKAGE
 try:
-    from dendropy import TreeList
+    from dendropy import TreeList, Node
     
     #for dendropy 4 compatability
     try:
@@ -40,7 +40,7 @@ def compat_encode_bipartitions(tree, **kwargs):
         treesplit.encode_splits(tree, **kwargs)
 
 
-def dendropy_read_treefile(treefiles, quiet=False, **kwargs):
+def dendropy_read_treefile(treefiles, quiet=False, preserve_underscores=False, **kwargs):
     out_stream = kwargs.pop('writer', sys.stderr)
     intrees = TreeList()
     if not treefiles:
@@ -49,10 +49,10 @@ def dendropy_read_treefile(treefiles, quiet=False, **kwargs):
         trees = sys.stdin.read()
         #try two input formats
         try:
-            intrees.extend(TreeList.get_from_string(trees, "nexus", case_sensitive_taxon_labels=True, preserve_underscores=True, **kwargs))
+            intrees.extend(TreeList.get_from_string(trees, "nexus", case_sensitive_taxon_labels=True, preserve_underscores=preserve_underscores, **kwargs))
         except (DataParseError, NexusReader.NotNexusFileError) as e:
             sys.stderr.write('%s\n' % e.message)
-            intrees.extend(TreeList.get_from_string(trees, "newick", case_sensitive_taxon_labels=True, preserve_underscores=True, **kwargs))
+            intrees.extend(TreeList.get_from_string(trees, "newick", case_sensitive_taxon_labels=True, preserve_underscores=preserve_underscores, **kwargs))
         except (DataParseError, Tokenizer.UnexpectedEndOfStreamError, AttributeError)  as e:
             if not quiet:
                 sys.stderr.write('%s\n' % e.message)
@@ -67,18 +67,17 @@ def dendropy_read_treefile(treefiles, quiet=False, **kwargs):
             try:
                 if not quiet:
                     out_stream.write('Reading file %s in nexus format ...\n' % tf)
-                intrees.extend(TreeList.get_from_path(tf, "nexus", case_sensitive_taxon_labels=True, preserve_underscores=True, **kwargs))
+                intrees.extend(TreeList.get_from_path(tf, "nexus", case_sensitive_taxon_labels=True, preserve_underscores=preserve_underscores, **kwargs))
 
             #except (DataParseError, dendropy.dataio.nexusreader.NotNexusFileError) as e:
             except (DataParseError, NexusReader.NotNexusFileError, AttributeError) as e:
                 try:
                     if not quiet:
                         out_stream.write('Reading file %s in newick format ...\n' % tf)
-                    intrees.extend(TreeList.get_from_path(tf, "newick", case_sensitive_taxon_labels=True, preserve_underscores=True, **kwargs))
+                    intrees.extend(TreeList.get_from_path(tf, "newick", case_sensitive_taxon_labels=True, preserve_underscores=preserve_underscores, **kwargs))
                 except (DataParseError, Tokenizer.UnexpectedEndOfStreamError, AttributeError)  as e:
                     if not quiet:
                         sys.stderr.write('%s\n' % e.message)
                         sys.exit('Could not read file %s in nexus or newick  format ...\n' % tf)
     return intrees
-
 
