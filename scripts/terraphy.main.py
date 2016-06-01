@@ -954,21 +954,20 @@ def superb_generate_master_sampling_tree(label_set, triplets, tns):
                     this_side = RandomSelectionNode(tns)
 
                     if len(subs) <= 2:
-                    new_subtree = Tree(taxon_namespace=tns)
+                        new_subtree = Tree(taxon_namespace=tns)
 
 
                         #this is done slightly differently if adding a leaf or cherry
                         if len(subs) == 1:
                             subtree_root = new_subtree.seed_node
                         else:
-                    subtree_root = new_subtree.seed_node.new_child()
+                            subtree_root = new_subtree.seed_node.new_child()
 
                         for el in subs:
-                        subtree_root.new_child(taxon=tns.require_taxon(label=el))
-                    
+                            subtree_root.new_child(taxon=tns.require_taxon(label=el))
                        
                         this_side.subtrees._trees.append(new_subtree)
-                else:
+                    else:
                         new_triplets = winnow_triplets(subs, triplets)
                         this_side = superb_generate_master_sampling_tree(subs, new_triplets, tns)
 
