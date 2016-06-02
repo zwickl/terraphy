@@ -15,7 +15,7 @@ import cProfile, pstats, StringIO
 
 #if terraphy isn't installed globally, and this script is being run from the examples directory, make sure it can find its own components
 opath=sys.path
-sys.path = [ "../" ] + ["../../"] + opath
+sys.path = [ "../" ] + ["../../"] + ["../../../"] + opath
 
 from terraphy.triplets import *
 from terraphy.coverage import *
@@ -195,7 +195,7 @@ def debug_output(label_set, triplets, components, level=0):
     print indent, '----'
 
 
-def make_build_tree(out, triplet_file, messages=sys.stderr, verbose=False):
+def make_build_tree(out, triplet_file, messages=sys.stderr, verbose=False, annotate=False):
     
     messages.write('Computing BUILD consensus tree...\n')
     label_set, triplets = read_triplet_file(triplet_file, messages=messages)
@@ -204,7 +204,7 @@ def make_build_tree(out, triplet_file, messages=sys.stderr, verbose=False):
     tns =  TaxonNamespace(label_set)
     tree.taxon_namespace = tns
     
-    build_or_strict_consensus(label_set, set(label_set), triplets, triplets, tree.seed_node, tns, build=True, verbose=verbose)
+    build_or_strict_consensus(label_set, set(label_set), triplets, triplets, tree.seed_node, tns, build=True, verbose=verbose, annotate=annotate)
    
     if out:
         if isinstance(out, str):
@@ -218,7 +218,7 @@ def make_build_tree(out, triplet_file, messages=sys.stderr, verbose=False):
     return tree
 
 
-def make_strict_tree(out, triplet_file, messages=sys.stderr, verbose=False):
+def make_strict_tree(out, triplet_file, messages=sys.stderr, verbose=False, annotate=False):
     
     messages.write('Computing strict consensus tree (this can take some time)...\n')
     label_set, triplets = read_triplet_file(triplet_file, messages=messages)
@@ -227,7 +227,7 @@ def make_strict_tree(out, triplet_file, messages=sys.stderr, verbose=False):
     tns =  TaxonNamespace(label_set)
     tree.taxon_namespace = tns
     
-    build_or_strict_consensus(label_set, set(label_set), triplets, triplets, tree.seed_node, tns, build=False, verbose=verbose)
+    build_or_strict_consensus(label_set, set(label_set), triplets, triplets, tree.seed_node, tns, build=False, verbose=verbosei, annotate=annotate)
    
     if out:
         if isinstance(out, str):
@@ -241,7 +241,7 @@ def make_strict_tree(out, triplet_file, messages=sys.stderr, verbose=False):
     return tree
 
 
-def build_or_strict_consensus(label_set, full_label_set, triplets, all_triplets, node, taxon_namespace, build, precomp=None, verbose=False):
+def build_or_strict_consensus(label_set, full_label_set, triplets, all_triplets, node, taxon_namespace, build, precomp=None, verbose=False, annotate=False):
     '''This function constructs the BUILD tree for given triplets or the strict consensus.
     The algorithms are essentially the same, the strict consensus just does a lot of
     extra work to see if an edge occurs in all trees before adding it.
@@ -257,6 +257,10 @@ def build_or_strict_consensus(label_set, full_label_set, triplets, all_triplets,
         #No triplets, so no internal branches within clade.  So, add polytomy of leaves
         for label in label_set:
             node.new_child(taxon=taxon_namespace.require_taxon(label=label)) 
+
+        # number of resolutions in clade is possible res for that many taxa
+        if annotate:
+            node.label = str(num_trees(len(label_set)))
 
     else:
         #This returns one component for each of the clades descending from this node
@@ -310,7 +314,18 @@ def build_or_strict_consensus(label_set, full_label_set, triplets, all_triplets,
                         if verbose:
                             print '\tREJECTED', comp
                         new_node = node
-                    build_or_strict_consensus(comp, full_label_set, new_trip, all_triplets, new_node, taxon_namespace, build, precomp=precomp, verbose=verbose)
+                    build_or_strict_consensus(comp, full_label_set, new_trip, all_triplets, new_node, taxon_namespace, build, precomp=precomp, verbose=verbose, annotate=annotate)
+
+                    if annotate:
+                        #this is not an efficient way to calculate the number of clade resolutions, since it does a full recursion and calculates
+                        #the number of res for all subclades in order to get the number for this clade, but doesn't store any of those subclade 
+                        #calculations.  At least in the case of a strict consensus that computation shouldn't have much impact.
+                        #it is able to reuse the components that were already calculated, and the winnowed triplets
+                        num_res = superb_count_parents(comp, new_trip)
+                        if num_res > 1:
+                            new_node.label = str(num_res)
+                            new_node.annotations.add_new('resolutions', '%s' % num_res)
+
         else:
             raise IncompatibleTripletException('Input is incompatible!')
 
@@ -1486,6 +1501,8 @@ analyses.add_argument('-l', '--list-terraces', action='store_true', default=Fals
 
 parser.add_argument('--simulate-coverage', type=float, nargs=3, default=None, help='simulate coverage matrices, using 3 values, #taxa #loci coverage')
 
+analyses.add_argument('-a', '--annotate-clades', action='store_true', default=False, help='add node labels indicating the number of alternative resolutions within each clade when  creating a build or strict consensus tree')
+
 parser.add_argument('--profile', action='store_true', default=False, help='profile the given functionality')
 
 parser.add_argument('--open-tree-viewer', action='store_true', default=False, help='attempt to open an external tree viewer for build or strict consensus trees')
@@ -1655,7 +1672,7 @@ try:
             if not options.triplet_file:
                 sys.exit('triplet file (-t) must be supplied to make BUILD tree')
             
-            build_tree = profile_wrapper(make_build_tree, prof, stdout_writer, options.triplet_file, messages=stderr_writer, verbose=options.verbose)
+            build_tree = profile_wrapper(make_build_tree, prof, stdout_writer, options.triplet_file, messages=stderr_writer, verbose=options.verbose, annotate=options.annotate_clades)
            
             if options.open_tree_viewer:
                 open_tree_viewer(tree_viewer_command, 'build.tre', build_tree)
@@ -1687,7 +1704,7 @@ try:
                 
                 #tk_gui.progress_bar.stop()
             else: 
-                strict_tree = profile_wrapper(make_strict_tree, prof, stdout_writer, options.triplet_file, messages=stderr_writer, verbose=options.verbose)
+                strict_tree = profile_wrapper(make_strict_tree, prof, stdout_writer, options.triplet_file, messages=stderr_writer, verbose=options.verbose, annotate=options.annotate_clades)
             
             if options.open_tree_viewer:
                 open_tree_viewer(tree_viewer_command, 'strict.tre', strict_tree)
