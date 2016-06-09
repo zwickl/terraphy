@@ -15,7 +15,7 @@ import cProfile, pstats, StringIO
 
 #if terraphy isn't installed globally, and this script is being run from the examples directory, make sure it can find its own components
 opath=sys.path
-sys.path = [ "../" ] + ["../../"] + ["../../../"] + opath
+sys.path = [ "../" ] + ["../../"] + ["../../../"] + ["../../../../"] + opath
 
 from terraphy.triplets import *
 from terraphy.coverage import *
@@ -1613,7 +1613,7 @@ if options.simulate_coverage:
     loci = int(options.simulate_coverage[1])
     cov = options.simulate_coverage[2]
 
-    sim_tree = uniform_pure_birth(TaxonSet(['t%d' % num for num in xrange(taxa)]))
+    sim_tree = uniform_pure_birth(TaxonNamespace(['t%d' % num for num in xrange(taxa)]))
     sim_tree.write_to_path('parent.tre', schema='nexus')
 
     mat = CoverageMatrix()
