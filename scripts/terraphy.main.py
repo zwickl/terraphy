@@ -227,7 +227,7 @@ def make_strict_tree(out, triplet_file, messages=sys.stderr, verbose=False, anno
     tns =  TaxonNamespace(label_set)
     tree.taxon_namespace = tns
     
-    build_or_strict_consensus(label_set, set(label_set), triplets, triplets, tree.seed_node, tns, build=False, verbose=verbosei, annotate=annotate)
+    build_or_strict_consensus(label_set, set(label_set), triplets, triplets, tree.seed_node, tns, build=False, verbose=verbose, annotate=annotate)
    
     if out:
         if isinstance(out, str):
@@ -321,6 +321,7 @@ def build_or_strict_consensus(label_set, full_label_set, triplets, all_triplets,
                         #the number of res for all subclades in order to get the number for this clade, but doesn't store any of those subclade 
                         #calculations.  At least in the case of a strict consensus that computation shouldn't have much impact.
                         #it is able to reuse the components that were already calculated, and the winnowed triplets
+                        #num_res = log(superb_count_parents(comp, new_trip))
                         num_res = superb_count_parents(comp, new_trip)
                         if num_res > 1:
                             new_node.label = str(num_res)
