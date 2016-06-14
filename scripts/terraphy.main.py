@@ -1490,6 +1490,8 @@ analyses = parser.add_argument_group('Analyses to be performed on files created 
 
 analyses.add_argument('-p', '--parents', action='store_true', default=False, help='compute the number of parent trees given a triplets file (requires --triplet-file')
 
+analyses.add_argument('--test-decisiveness', action='store_true', default=False, help='test whether supplied coverage matrix cannot result in terraces (i.e. is decisive) (requires --subset-file')
+
 analyses.add_argument('--generate-parents', action='store_true', default=False, help='generate compatible parent trees given a triplets file (requires --triplet-file')
 
 analyses.add_argument('--sample-parents', default=0, type=int, help='sample indicated number of  parent trees given a triplets file (requires --triplet-file')
@@ -1539,7 +1541,7 @@ if len(sys.argv) == 1:
     
     tk_gui.register_dependencies({'--triplet-file':['--build', '--parents', '--strict'], 
                                 '--alignment-file':'--coverage', 
-                                '--subset-file':['--display', '--list-terraces'],
+                                '--subset-file':['--display', '--list-terraces', 'test-decisiveness'],
                                 '--parent-tree-file':'--display', 
                                 '--treefiles-to-assign':'--list-terraces'})
     
@@ -1675,6 +1677,17 @@ try:
                 sys.stderr.write('%30s\t%s\n' % (tax, ''.join([out_trans[c] for c in cov])))
 
     while True:
+        if options.test_decisiveness:
+            if not options.subset_file:
+                sys.exit('subset file (--subset-file) must be provided to test decisiveness')
+
+            if profile_wrapper(mat.test_decisiveness, prof):
+                print 'Decisive - no possibility of terraces'
+            else:
+                print 'not decisive - terraces possible'
+            exit()
+
+
         if options.build:
             if not options.triplet_file:
                 sys.exit('triplet file (-t) must be supplied to make BUILD tree')
@@ -1739,7 +1752,7 @@ try:
         
         if options.list_terraces:
             if not options.subset_file or not options.treefiles_to_assign:
-                sys.exit('must specify both subset file (-s) and --treefiles-to-assign to assign trees to terraces')
+                sys.exit('must specify both subset file (--subset-file) and --treefiles-to-assign to assign trees to terraces')
             profile_wrapper(assign_to_terraces, prof, stdout_writer, options.treefiles_to_assign, options.subset_file, messages=stderr_writer)
             #profile_wrapper(assign_to_terraces_using_hashes, prof, stdout_writer, options.treefiles_to_assign, options.subset_file, messages=stderr_writer)
 
