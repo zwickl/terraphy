@@ -1618,7 +1618,7 @@ if options.simulate_coverage:
 
     mat = CoverageMatrix()
     mat.fill_random(taxa, loci, cov, lambda x, y, c: c, reference_taxon=True)
-    mat.print_subset_vectors()
+    #mat.print_subset_vectors()
     #exponential pdf is lam * e^(lam*x)
     #where scale param is 1/lam=mean
     #exp_scale = 1.0
@@ -1627,9 +1627,15 @@ if options.simulate_coverage:
     #mat.fill_random_locus_func(taxa, loci, partial(exponential, cov), min_coverage=0.2, max_coverage=0.8, reference_taxon=True)
     #mat.fill_random_taxon_func(taxa, loci, partial(exponential, cov), min_coverage=0.2, max_coverage=0.8, reference_taxon=True)
     #mat.print_subset_vectors()
-    #profile_wrapper(mat.test_decisiveness, prof)
+    
+    if profile_wrapper(mat.test_decisiveness, prof):
+        print 'Decisive - no possibility of terraces'
+    else:
+        print 'not decisive - terraces possible'
 
-    prob = 1.0 - (taxa - 2.0) * (1.0 - cov**3)**loci
+    sys.exit()
+
+    #prob = 1.0 - (taxa - 2.0) * (1.0 - cov**3)**loci
     #print 'Min prob decisive for tree: %f' % prob
     #stderr_writer.write('Min prob decisive for tree: %f\n' % prob)
 
