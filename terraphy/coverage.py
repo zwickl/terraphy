@@ -172,9 +172,9 @@ class CoverageMatrix(object):
         tlist = list(self.taxa)
 
         if not self.find_reference_taxon():
-            print 'NOREF' 
+            print 'NO reference taxon present (decisiveness test may not be accurate)' 
         else:
-            print 'REF' 
+            print 'Reference taxon present' 
         
         num_tests = 0
         found = 0
@@ -187,8 +187,8 @@ class CoverageMatrix(object):
                     for n4, t4 in enumerate(tlist[n3:], n3+1):
                         q = {t1, t2, t3, t4}
                         num_q_tests += 1
-                        if num_q_tests % 10000 == 0:
-                            print '%g' % num_q_tests
+                        #if num_q_tests % 10000 == 0:
+                        #    print '%g' % num_q_tests
                         for col in self.per_locus_taxon_sets:
                             num_tests += 1
                             if q.issubset(col):
@@ -200,9 +200,9 @@ class CoverageMatrix(object):
                             else:
                                 pass
                                 #print 'FAILED',
-                                #return False
-        print  '\t'.join(['Tests: %g' % num_tests, 'Qs: %g' % num_q_tests, 'QsFound: %g' % found, 'Prop: %g' % (float(found)/num_q_tests)])
-        #return True
+                                return False
+        #print  '\t'.join(['Tests: %g' % num_tests, 'Qs: %g' % num_q_tests, 'QsFound: %g' % found, 'Prop: %g' % (float(found)/num_q_tests)])
+        return True
         
         num_tests = 0
         found = 0
@@ -214,8 +214,8 @@ class CoverageMatrix(object):
                 for n3, t3 in enumerate(tlist[n2:], n2+1):
                     trip = {t1, t2, t3}
                     num_t_tests += 1
-                    if num_t_tests % 10000 == 0:
-                        print '%g' % num_t_tests
+                    #if num_t_tests % 10000 == 0:
+                    #    print '%g' % num_t_tests
                     for col in self.per_locus_taxon_sets:
                         num_tests += 1
                         if trip.issubset(col):
@@ -226,11 +226,11 @@ class CoverageMatrix(object):
                             pass
                         else:
                             #print 'FAILED',
-                            pass
-                            #return False
+                            #pass
+                            return False
         #print (True, '%g' % num_tests, '%g' % num_t_tests, '%g' % found, '%g' % (float(found)/num_t_tests))
-        print  '\t'.join(['Tests: %g' % num_tests, 'Ts: %g' % num_t_tests, 'TsFound: %g' % found, 'Prop: %g' % (float(found)/num_t_tests)])
-        #return True
+        #print  '\t'.join(['Tests: %g' % num_tests, 'Ts: %g' % num_t_tests, 'TsFound: %g' % found, 'Prop: %g' % (float(found)/num_t_tests)])
+        return True
 
     def draw_matrix_graphic(self, canvas, sorted_taxa, x_offset, y_offset, width, height):
         '''Draw a checkerboard representation of matrix coverage onto a tkinter canvas
