@@ -260,7 +260,10 @@ def build_or_strict_consensus(label_set, full_label_set, triplets, all_triplets,
 
         # number of resolutions in clade is possible res for that many taxa
         if annotate:
-            node.label = str(num_trees(len(label_set)))
+            num_res = str(num_trees(len(label_set)))
+            valstr = "%.4G" % num_res
+            new_node.label = valstr
+            new_node.annotations.add_new('resolutions', '%s' % valstr)
 
     else:
         #This returns one component for each of the clades descending from this node
@@ -324,8 +327,9 @@ def build_or_strict_consensus(label_set, full_label_set, triplets, all_triplets,
                         #num_res = log(superb_count_parents(comp, new_trip))
                         num_res = superb_count_parents(comp, new_trip)
                         if num_res > 1:
-                            new_node.label = str(num_res)
-                            new_node.annotations.add_new('resolutions', '%s' % num_res)
+                            valstr = "%.4G" % num_res
+                            new_node.label = valstr
+                            new_node.annotations.add_new('resolutions', '%s' % valstr)
 
         else:
             raise IncompatibleTripletException('Input is incompatible!')
