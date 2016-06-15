@@ -195,7 +195,7 @@ def debug_output(label_set, triplets, components, level=0):
     print indent, '----'
 
 
-def make_build_tree(out, triplet_file, messages=sys.stderr, verbose=False, annotate=False):
+def make_build_tree(out, triplet_file, messages=sys.stderr, verbose=False, annotate=False, nexus=False):
     
     messages.write('Computing BUILD consensus tree...\n')
     label_set, triplets = read_triplet_file(triplet_file, messages=messages)
@@ -206,12 +206,14 @@ def make_build_tree(out, triplet_file, messages=sys.stderr, verbose=False, annot
     tl.append(tree)
 
     build_or_strict_consensus(label_set, set(label_set), triplets, triplets, tree.seed_node, tns, build=True, verbose=verbose, annotate=annotate)
-   
 
     if isinstance(out, str):
         out = open(out, 'w')
 
-    tl.write_to_stream(dest=out, schema='newick')
+    if nexus:
+        tl.write_to_stream(dest=out, schema='nexus')
+    else:
+        tl.write_to_stream(dest=out, schema='newick')
     
     messages.write('Done with BUILD consensus tree.\n')
     
@@ -219,7 +221,7 @@ def make_build_tree(out, triplet_file, messages=sys.stderr, verbose=False, annot
     return tree
 
 
-def make_strict_tree(out, triplet_file, messages=sys.stderr, verbose=False, annotate=False):
+def make_strict_tree(out, triplet_file, messages=sys.stderr, verbose=False, annotate=False, nexus=False):
     
     messages.write('Computing strict consensus tree (this can take some time)...\n')
     label_set, triplets = read_triplet_file(triplet_file, messages=messages)
@@ -235,7 +237,10 @@ def make_strict_tree(out, triplet_file, messages=sys.stderr, verbose=False, anno
     if isinstance(out, str):
         out = open(out, 'w')
 
-    tl.write_to_stream(dest=out, schema='newick')
+    if nexus:
+        tl.write_to_stream(dest=out, schema='nexus')
+    else:
+        tl.write_to_stream(dest=out, schema='newick')
     
     messages.write('Done with strict consensus tree.\n')
     #this is the legacy behavior, returning instead of writing in the func
@@ -614,9 +619,9 @@ def compute_comp_dict(label_set, triplets, comp_dict, verbose=False, level=1):
 
 
 def count_trees_on_terrace(out, triplet_file, messages=sys.stderr):
-    label_set, triplets = read_triplet_file(triplet_file, messages=messages)
 
     messages.write('Counting parent trees on terrace...\n')
+    label_set, triplets = read_triplet_file(triplet_file, messages=messages)
     num_par = superb_count_parents(label_set, triplets)
 
     if out:
@@ -702,12 +707,11 @@ def combine_subtrees(left_treelist, right_treelist):
     return subtrees
 
 
-def generate_trees_on_terrace(out, triplet_file, messages=sys.stderr):
-    label_set, triplets = read_triplet_file(triplet_file, messages=messages)
+def generate_trees_on_terrace(out, triplet_file, messages=sys.stderr, nexus=False):
 
-    tns =  TaxonNamespace(label_set)
-    
     messages.write('Generating parent trees on terrace...\n')
+    label_set, triplets = read_triplet_file(triplet_file, messages=messages)
+    tns =  TaxonNamespace(label_set)
     parents = superb_generate_parents(label_set, triplets, tns)
     num_par = len(parents)
 
@@ -721,9 +725,10 @@ def generate_trees_on_terrace(out, triplet_file, messages=sys.stderr):
         out_stream = out
 
     #supressing several tree features that we know won't apply to these trees sppeds up tree writing a bit
-    parents.write_to_stream(dest=out, schema='newick', suppress_edge_lengths=True, suppress_internal_node_labels=True, suppress_internal_taxon_labels=True, suppress_annotations=True, unquoted_underscores=True)
-    #parents.write_to_stream(dest=out, schema='nexus', suppress_edge_lengths=True, suppress_internal_node_labels=True, suppress_internal_taxon_labels=True, suppress_annotations=True, unquoted_underscores=True)
-
+    if nexus:
+        parents.write_to_stream(dest=out, schema='nexus', suppress_edge_lengths=True, suppress_internal_node_labels=True, suppress_internal_taxon_labels=True, suppress_annotations=True, unquoted_underscores=True)
+    else:
+        parents.write_to_stream(dest=out, schema='newick', suppress_edge_lengths=True, suppress_internal_node_labels=True, suppress_internal_taxon_labels=True, suppress_annotations=True, unquoted_underscores=True)
     
     if messages:
         messages.write('generated %d trees on terrace\n' % num_par)
@@ -892,20 +897,17 @@ class RandomSelectionNode(object):
                 print 'r%s' % num
                 r.debug_print()
 
-def sample_trees_on_terrace(num, out, triplet_file, messages=sys.stderr):
+def sample_trees_on_terrace(num, out, triplet_file, messages=sys.stderr, nexus=False):
+    
+    messages.write('Sampling %d  parent trees on terrace...\n' % num)
     label_set, triplets = read_triplet_file(triplet_file, messages=messages)
 
     tns =  TaxonNamespace(label_set)
-    
-    messages.write('Sampling %d  parent trees on terrace...\n' % num)
 
     #base_node = RandomSelectionNode()
     #superb_generate_master_sampling_tree(base_node, label_set, triplets, tns)
     #root = superb_generate_master_sampling_tree(label_set, triplets, tns)
     root = superb_generate_master_sampling_tree(label_set, triplets, tns)
-
-
-    #root.debug_print()
 
     parents = TreeList(taxon_namespace=tns)
     for _ in xrange(num):
@@ -925,17 +927,16 @@ def sample_trees_on_terrace(num, out, triplet_file, messages=sys.stderr):
     for p in parents:
         p.seed_node = p.seed_node.child_nodes()[0]
 
-
     if isinstance(out, str):
         out_stream = open(out, 'wb') 
     else:
         out_stream = out
 
     #supressing several tree features that we know won't apply to these trees sppeds up tree writing a bit
-    
-    parents.write_to_stream(dest=out, schema='newick', suppress_edge_lengths=True, suppress_internal_node_labels=True, suppress_internal_taxon_labels=True, suppress_annotations=True, unquoted_underscores=True)
-    
-    #parents.write_to_stream(dest=out, schema='nexus', suppress_edge_lengths=True, suppress_internal_node_labels=True, suppress_internal_taxon_labels=True, suppress_annotations=True, unquoted_underscores=True)
+    if nexus:
+        parents.write_to_stream(dest=out, schema='nexus', suppress_edge_lengths=True, suppress_internal_node_labels=True, suppress_internal_taxon_labels=True, suppress_annotations=True, unquoted_underscores=True)
+    else:
+        parents.write_to_stream(dest=out, schema='newick', suppress_edge_lengths=True, suppress_internal_node_labels=True, suppress_internal_taxon_labels=True, suppress_annotations=True, unquoted_underscores=True)
 
     messages.write(' done.\n')
     #return num_par, parents
@@ -1522,6 +1523,8 @@ analyses.add_argument('-a', '--annotate-clades', action='store_true', default=Fa
 
 parser.add_argument('--profile', action='store_true', default=False, help='profile the given functionality')
 
+parser.add_argument('--nexus', action='store_true', default=False, help='use nexus format for output trees')
+
 parser.add_argument('--open-tree-viewer', action='store_true', default=False, help='attempt to open an external tree viewer for build or strict consensus trees')
 
 parser.add_argument('--verbose', action='store_true', default=False, help='spit out extra information for debugging purposes')
@@ -1706,7 +1709,7 @@ try:
             if not options.triplet_file:
                 sys.exit('triplet file (-t) must be supplied to make BUILD tree')
             
-            build_tree = profile_wrapper(make_build_tree, prof, stdout_writer, options.triplet_file, messages=stderr_writer, verbose=options.verbose, annotate=options.annotate_clades)
+            build_tree = profile_wrapper(make_build_tree, prof, stdout_writer, options.triplet_file, messages=stderr_writer, verbose=options.verbose, annotate=options.annotate_clades, nexus=options.nexus)
            
             if options.open_tree_viewer:
                 open_tree_viewer(tree_viewer_command, 'build.tre', build_tree)
@@ -1738,7 +1741,7 @@ try:
                 
                 #tk_gui.progress_bar.stop()
             else: 
-                strict_tree = profile_wrapper(make_strict_tree, prof, stdout_writer, options.triplet_file, messages=stderr_writer, verbose=options.verbose, annotate=options.annotate_clades)
+                strict_tree = profile_wrapper(make_strict_tree, prof, stdout_writer, options.triplet_file, messages=stderr_writer, verbose=options.verbose, annotate=options.annotate_clades, nexus=options.nexus)
             
             if options.open_tree_viewer:
                 open_tree_viewer(tree_viewer_command, 'strict.tre', strict_tree)
@@ -1753,14 +1756,14 @@ try:
         if options.generate_parents:
             if not options.triplet_file:
                 sys.exit('triplet file (-t) must be supplied to generate parent trees')
-            profile_wrapper(generate_trees_on_terrace, prof, stdout_writer, options.triplet_file, messages=stderr_writer)
+            profile_wrapper(generate_trees_on_terrace, prof, stdout_writer, options.triplet_file, messages=stderr_writer, nexus=options.nexus)
             if tk_root:
                 tk_root.mainloop()
 
         if options.sample_parents:
             if not options.triplet_file:
                 sys.exit('triplet file (-t) must be supplied to sample parent trees')
-            profile_wrapper(sample_trees_on_terrace, prof, options.sample_parents, stdout_writer, options.triplet_file, messages=stderr_writer)
+            profile_wrapper(sample_trees_on_terrace, prof, options.sample_parents, stdout_writer, options.triplet_file, messages=stderr_writer, nexus=options.nexus)
             if tk_root:
                 tk_root.mainloop()
         
