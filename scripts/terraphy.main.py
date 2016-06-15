@@ -267,7 +267,8 @@ def build_or_strict_consensus(label_set, full_label_set, triplets, all_triplets,
         # number of resolutions in clade is possible res for that many taxa
         if annotate:
             num_res = num_trees(len(label_set))
-            valstr = "%.4g" % num_res
+            #valstr = "%.4g" % num_res
+            valstr = "%d" % num_res
             node.label = valstr
             node.annotations.add_new('resolutions', '%s' % valstr)
 
@@ -334,6 +335,7 @@ def build_or_strict_consensus(label_set, full_label_set, triplets, all_triplets,
                         num_res = superb_count_parents(comp, new_trip)
                         if num_res > 1:
                             valstr = "%.4g" % num_res
+                            valstr = "%d" % num_res
                             new_node.label = valstr
                             new_node.annotations.add_new('resolutions', '%s' % valstr)
 
