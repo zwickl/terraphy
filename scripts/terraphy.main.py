@@ -200,20 +200,21 @@ def make_build_tree(out, triplet_file, messages=sys.stderr, verbose=False, annot
     messages.write('Computing BUILD consensus tree...\n')
     label_set, triplets = read_triplet_file(triplet_file, messages=messages)
     
-    tree = Tree()
     tns =  TaxonNamespace(label_set)
-    tree.taxon_namespace = tns
-    
+    tl = TreeList(taxon_namespace=tns)
+    tree = Tree(taxon_namespace=tns)
+    tl.append(tree)
+
     build_or_strict_consensus(label_set, set(label_set), triplets, triplets, tree.seed_node, tns, build=True, verbose=verbose, annotate=annotate)
    
-    if out:
-        if isinstance(out, str):
-            with open(out, 'w') as out_stream:
-                out_stream.write('%s;\n' % tree)
-        else:
-            out.write('%s;\n' % tree)
+
+    if isinstance(out, str):
+        out = open(out, 'w')
+
+    tl.write_to_stream(dest=out, schema='newick')
     
     messages.write('Done with BUILD consensus tree.\n')
+    
     #this is the legacy behavior, returning instead of writing in the func
     return tree
 
@@ -223,18 +224,18 @@ def make_strict_tree(out, triplet_file, messages=sys.stderr, verbose=False, anno
     messages.write('Computing strict consensus tree (this can take some time)...\n')
     label_set, triplets = read_triplet_file(triplet_file, messages=messages)
     
-    tree = Tree()
+   
     tns =  TaxonNamespace(label_set)
-    tree.taxon_namespace = tns
+    tl = TreeList(taxon_namespace=tns)
+    tree = Tree(taxon_namespace=tns)
+    tl.append(tree)
     
     build_or_strict_consensus(label_set, set(label_set), triplets, triplets, tree.seed_node, tns, build=False, verbose=verbose, annotate=annotate)
-   
-    if out:
-        if isinstance(out, str):
-            with open(out, 'w') as out_stream:
-                out_stream.write('%s;\n' % tree)
-        else:
-            out.write('%s;\n' % tree)
+  
+    if isinstance(out, str):
+        out = open(out, 'w')
+
+    tl.write_to_stream(dest=out, schema='newick')
     
     messages.write('Done with strict consensus tree.\n')
     #this is the legacy behavior, returning instead of writing in the func
@@ -668,6 +669,9 @@ def superb_count_parents(label_set, triplets):
 def combine_subtrees(left_treelist, right_treelist):
     '''Return TreeList containing all combinations of left and right
     subtrees from passed TreeLists
+    Note that all trees have their real "root", as a child of the seed_node, 
+    the usual root.  It may be easiest to alter this at a higher level, rather than
+    running the risk of borking functions that depend on this current behavior.
     '''
 
     tns = left_treelist.taxon_namespace
@@ -706,6 +710,10 @@ def generate_trees_on_terrace(out, triplet_file, messages=sys.stderr):
     messages.write('Generating parent trees on terrace...\n')
     parents = superb_generate_parents(label_set, triplets, tns)
     num_par = len(parents)
+
+    #correct the tree representation, which has the real root as a child of the seed_node
+    for p in parents:
+        p.seed_node = p.seed_node.child_nodes()[0]
 
     if isinstance(out, str):
         out_stream = open(out, 'wb') 
@@ -913,8 +921,10 @@ def sample_trees_on_terrace(num, out, triplet_file, messages=sys.stderr):
                 parents.append(p)
         '''
 
-    #print type(root)
-    #print type(parents)
+    #correct the tree representation, which has the real root as a child of the seed_node
+    for p in parents:
+        p.seed_node = p.seed_node.child_nodes()[0]
+
 
     if isinstance(out, str):
         out_stream = open(out, 'wb') 
