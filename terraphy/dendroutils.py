@@ -4,7 +4,7 @@ import os
 
 #DENDROPY PACKAGE
 try:
-    from dendropy import TreeList, Node
+    from dendropy import TreeList, Tree, Node
     
     #for dendropy 4 compatability
     try:
@@ -38,6 +38,64 @@ def compat_encode_bipartitions(tree, **kwargs):
         tree.encode_bipartitions(**kwargs)
     elif not hasattr(tree, "bipartition_encoding") or not tree.bipartition_encoding:
         treesplit.encode_splits(tree, **kwargs)
+
+
+def displayed_subtree(tree, labels):
+    #this is annoying, but Dendropy can consider the labels not matching depending on 
+    #underscore vs. space issues
+    #Realized that using retain_taxa vs prune_taxa doesn't make any difference - dendropy
+    #used prune behind the scenes regardless
+    #DP3 vs. DP4 
+    if hasattr(tree, 'taxon_namespace'):
+        newtree = Tree(tree, taxon_namespace=tree.taxon_namespace)
+    else:
+        newtree = Tree(tree, taxon_set=tree.taxon_set)
+
+    if isinstance(labels[0], str):
+            newtree.retain_taxa_with_labels(labels)
+    else:
+            newtree.retain_taxa(labels)
+
+    #compat_encode_bipartitions now maps delete_outdegree_one to collapse_unrooted_basal_bifurcation in DP 4
+    compat_encode_bipartitions(newtree, delete_outdegree_one=False)
+    return newtree
+
+def same_tree(reference_tree, test_tree):
+    '''This is adapted from false_positives_and_negatives() in dendropy treecalc module,
+    and just bails when it finds the first different split.
+    Should handle polytomies fine.
+    '''
+
+    #ref_tset = compat_get_taxon_set(reference_tree)
+    #test_tset = compat_get_taxon_set(test_tree)
+    ref_tset = reference_tree.taxon_namespace
+    test_tset =test_tree.taxon_namespace
+    if ref_tset is not test_tset:
+        raise TypeError("Trees have different TaxonSet objects: %s vs. %s" \
+                % (hex(id(ref_tset)), hex(id(test_tset))))
+
+    compat_encode_bipartitions(reference_tree)
+    compat_encode_bipartitions(test_tree)
+
+    '''
+    #seems like this set comparison should be faster, but not really
+    if isinstance(reference_tree.split_edges, dict):
+        if set(reference_tree.split_edges.keys()) != set(test_tree.split_edges.keys()):
+            return False
+    elif set(reference_tree.split_edges) != set(test_tree.split_edges):
+        return False
+    '''
+    for split in reference_tree.bipartition_encoding:
+        if split not in test_tree.bipartition_encoding:
+            return False
+
+    for split in test_tree.bipartition_encoding:
+        if split not in reference_tree.bipartition_encoding:
+            return False
+
+    return True
+
+
 
 
 def dendropy_read_treefile(treefiles, quiet=False, preserve_underscores=False, **kwargs):
