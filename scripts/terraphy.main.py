@@ -631,7 +631,7 @@ def count_trees_on_terrace(out, triplet_file, messages=sys.stderr):
     if out:
         if isinstance(out, str):
             with open(out, 'w') as out_stream:
-                out_stream.write('%d trees on terrace\n' % num_par)
+                out_stream.write('%g trees on terrace\n' % num_par)
         else:
             out.write('%d trees on terrace\n' % num_par)
     
@@ -1451,13 +1451,14 @@ analyses = parser.add_argument_group('Analyses to be performed on files created 
 
 #analyses.gui_options = {'start_hidden':True}
 
-analyses.add_argument('-p', '--parents', action='store_true', default=False, help='compute the number of parent trees given a triplets file (requires --triplet-file')
+analyses.add_argument('--count-parents', action='store_true', default=False, help='compute the number of parent trees given a triplets file (requires --triplet-file)')
 
-analyses.add_argument('--test-decisiveness', action='store_true', default=False, help='test whether supplied coverage matrix cannot result in terraces (i.e. is decisive) (requires --subset-file')
+#this isn't working yet
+#analyses.add_argument('--test-decisiveness', action='store_true', default=False, help='test whether supplied coverage matrix cannot result in terraces (i.e. is decisive) (requires --subset-file)')
 
-analyses.add_argument('--generate-parents', action='store_true', default=False, help='generate compatible parent trees given a triplets file (requires --triplet-file')
+analyses.add_argument('--generate-parents', action='store_true', default=False, help='generate compatible parent trees given a triplets file (requires --triplet-file)')
 
-analyses.add_argument('--sample-parents', default=0, type=int, help='sample indicated number of  parent trees given a triplets file (requires --triplet-file')
+analyses.add_argument('--sample-parents', default=0, type=int, help='sample indicated number of  parent trees given a triplets file (requires --triplet-file)')
 
 analyses.add_argument('-b', '--build', action='store_true', default=False, help='compute the BUILD tree from a triplet file (requires --triplet-file)')
 
@@ -1642,6 +1643,8 @@ try:
                 sys.stderr.write('%30s\t%s\n' % (tax, ''.join([out_trans[c] for c in cov])))
 
     while True:
+        '''
+        #decisiveness isn't working yet
         if options.test_decisiveness:
             if not options.subset_file:
                 sys.exit('subset file (--subset-file) must be provided to test decisiveness')
@@ -1651,7 +1654,7 @@ try:
             else:
                 print 'not decisive - terraces possible'
             exit()
-
+        '''
 
         if options.build:
             if not options.triplet_file:
@@ -1694,7 +1697,7 @@ try:
             if options.open_tree_viewer:
                 open_tree_viewer(tree_viewer_command, 'strict.tre', strict_tree)
             
-        if options.parents:
+        if options.count_parents:
             if not options.triplet_file:
                 sys.exit('triplet file (-t) must be supplied to count parent trees')
             profile_wrapper(count_trees_on_terrace, prof, stdout_writer, options.triplet_file, messages=stderr_writer)

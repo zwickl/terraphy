@@ -56,7 +56,7 @@ fi
 
 echo PARENTS
 if [ ! -e $OUTDIR/parentCount ];then
-    $MAIN --parents --triplet-file TRIPLETS > $OUTDIR/parentCount || exit
+    $MAIN --count-parents --triplet-file TRIPLETS > $OUTDIR/parentCount || exit
 fi
 
 echo GENERATE-PARENTS

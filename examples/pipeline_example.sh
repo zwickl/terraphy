@@ -45,7 +45,7 @@ $MAIN -t --subtree-file $SUBTREES > $TRIPLETS || exit
 
 PARENTS=$OUTDIR/parentCount 
 echo COUNTING TREES ON TERRACE, i.e. "parent trees"
-$MAIN --parents --triplet-file $TRIPLETS > $PARENTS || exit
+$MAIN --count-parents --triplet-file $TRIPLETS > $PARENTS || exit
 
 BUILD=$OUTDIR/build.tre 
 echo MAKING BUILD CONSENSUS TREE OF TERRACE TREES
