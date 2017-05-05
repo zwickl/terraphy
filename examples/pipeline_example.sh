@@ -49,7 +49,7 @@ $MAIN --parents --triplet-file $TRIPLETS > $PARENTS || exit
 
 BUILD=$OUTDIR/build.tre 
 echo MAKING BUILD CONSENSUS TREE OF TERRACE TREES
-$MAIN --build --annotate-clades --triplet-file $TRIPLETS > $BUILD || exit
+$MAIN --build  --triplet-file $TRIPLETS > $BUILD || exit
 
 PARENTS=$OUTDIR/allParents.tre
 #this function is generally impractical on most datasets and is commented out here
@@ -62,8 +62,8 @@ echo SAMPLING $SAMP TREES FROM TERRACE
 $MAIN --sample-parents $SAMP --triplet-file $TRIPLETS > $SAMPLES || exit
 
 STRICT=$OUTDIR/strict.tre 
-#this function is impractical on manuy datasets and is commented out here
-#echo iMAKING STRICT CONSENSUS OF TREES ON TERRACE
+#this function is impractical on many datasets and is commented out here
+#echo MAKING STRICT CONSENSUS OF TREES ON TERRACE
 #$MAIN --strict --annotate-clades --triplet-file $TRIPLETS > $STRICT || exit
 
 LIST=$OUTDIR/terraceList
