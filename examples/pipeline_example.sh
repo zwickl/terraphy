@@ -34,7 +34,7 @@ $MAIN --coverage --alignment-file $ALN > $SUBSETS || exit
 
 echo CREATING SUBTREES
 #the subtrees file requires the parent tree and subsets file as input
-$MAIN --display --parent-tree $TREE --subset-file $SUBSETS > $SUBTREES || exit
+$MAIN --display --parent-tree-file $TREE --subset-file $SUBSETS > $SUBTREES || exit
 
 echo CREATING TRIPLETS
 #the triplets file requires the subtrees file  as input
@@ -57,7 +57,7 @@ PARENTS=$OUTDIR/allParents.tre
 #$MAIN --generate-parents --triplet-file $TRIPLETS > $PARENTS || exit
 
 SAMP=100
-SAMPLES=$OUTDIR/samp100.tre 
+SAMPLES=$OUTDIR/samp"$SAMP".tre 
 echo SAMPLING $SAMP TREES FROM TERRACE
 $MAIN --sample-parents $SAMP --triplet-file $TRIPLETS > $SAMPLES || exit
 
@@ -67,7 +67,10 @@ STRICT=$OUTDIR/strict.tre
 #$MAIN --strict --annotate-clades --triplet-file $TRIPLETS > $STRICT || exit
 
 LIST=$OUTDIR/terraceList
+INPUTTREES=$INPUTDIR/100pars.tre
 echo ASSIGNING TREES TO TERRACES
-../scripts/terraphy.main.py --list-terraces --subset-file $SUBSETS --treefiles-to-assign $INPUTDIR/100pars.tre > $LIST
+#This is a optional specialized functionality to test whether a set of input trees lies on a single or
+#multiple terraces
+../scripts/terraphy.main.py --list-terraces --subset-file $SUBSETS --treefiles-to-assign $INPUTTREES > $LIST
 
 

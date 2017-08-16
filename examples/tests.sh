@@ -1,7 +1,7 @@
 #!/bin/bash
 
-DATA=Pyron
-#DATA=Bouchenak
+#DATA=Pyron
+DATA=Bouchenak
 
 #input files
 INPUTDIR=input/$DATA
@@ -43,20 +43,19 @@ fi
 
 echo SUBTREES
 if [ ! -e $SUBTREES ];then
-    $MAIN --display --parent-tree $TREE --subset-file $SUBSETS > $SUBTREES || exit
+    $MAIN --display --parent-tree-file $TREE --subset-file $SUBSETS > $SUBTREES || exit
 fi
 
 echo TRIPLETS
-if [ ! -e TRIPLETS ];then
-    $MAIN -t --subtree-file $SUBTREES > TRIPLETS || exit
-    #grep -v "[ ].*[ ].*[ ].*" temp >> TRIPLETS || exit
-    #some giberish sometimes gets output to the stream
-    perl -p -i -e 's/^.*1034h//g' TRIPLETS
+if [ ! -e $TRIPLETS ];then
+    $MAIN -t --subtree-file $SUBTREES > $TRIPLETS || exit
+    #some giberish sometimes gets output to the stream, remove it
+    perl -p -i -e 's/^.*1034h//g' $TRIPLETS
 fi
 
 echo PARENTS
 if [ ! -e $OUTDIR/parentCount ];then
-    $MAIN --count-parents --triplet-file TRIPLETS > $OUTDIR/parentCount || exit
+    $MAIN --count-parents --triplet-file $TRIPLETS > $OUTDIR/parentCount || exit
 fi
 
 echo GENERATE-PARENTS
@@ -69,14 +68,14 @@ fi
 BUILD=$OUTDIR/build.tre 
 if [ ! -e $BUILD ];then
     echo BUILD
-    $MAIN --build --triplet-file TRIPLETS > $BUILD || exit
+    $MAIN --build --triplet-file $TRIPLETS > $BUILD || exit
 fi
 
 
 STRICT=$OUTDIR/strict.tre 
 if [ ! -e $STRICT ];then
     echo STRICT
-    $MAIN --strict --triplet-file TRIPLETS > $STRICT || exit
+    $MAIN --strict --triplet-file $TRIPLETS > $STRICT || exit
 fi
 
 
