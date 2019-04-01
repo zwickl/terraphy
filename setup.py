@@ -63,7 +63,8 @@ else:
 __version__ = 1.0
 
 ### compose long description ###
-long_description = open('README.txt').read()
+#long_description = open('README.txt').read()
+long_description='Scripts for analyzing phylogenetic terraces.'
 
 setup(name='terraphy',
       version=__version__,
