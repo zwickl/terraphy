@@ -17,9 +17,14 @@ ALN=$INPUTDIR/aln.exported.nex
 OUTDIR=pipeline.output 
 mkdir -p $OUTDIR
 
-#the terraphy script in the in the current directory tree is used in this script
+#this will default to using the terraphy script within the package download
+#to use a globally installed copy uncomment the third line here
 TERRAPHYDIR=../scripts/
 MAIN=$TERRAPHYDIR/terraphy.main.py
+#MAIN=`which terraphy.main.py`
+
+#PREVIOUS OUTPUT WILL BE OVERWRITTEN EACH TIME THIS SCRIPT IS CALLED
+#SEE the test.sh SCRIPT FOR AN EXAMPLE OF HOW TO NOT RECOMPUTE EXISTING FILES
 
 #the intermediate files created by preproccesing of the input tree and alignment
 #are named "subsets", "subtrees" and "triplets"

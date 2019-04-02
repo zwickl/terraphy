@@ -22,8 +22,11 @@ if [ -d "$PERLSCRIPTDIR" ];then
     #$PERLSCRIPTDIR/sameTerrace.pl $INPUTDIR/100pars.phy $OUTDIR/perlSubsets > $OUTDIR/perlTerraceList || exit
 fi
 
+#this will default to using the terraphy script within the package download
+#to use a globally installed copy uncomment the third line here
 TERRAPHYDIR=../scripts/
 MAIN=$TERRAPHYDIR/terraphy.main.py
+#MAIN=`which terraphy.main.py`
 
 
 SUBSETS=$OUTDIR/subsets
