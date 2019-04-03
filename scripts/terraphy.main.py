@@ -328,6 +328,11 @@ def build_or_strict_consensus(label_set, full_label_set, triplets, all_triplets,
                         if verbose:
                             print '\tREJECTED', comp
                         new_node = node
+
+
+                    #TODO
+                    #extra call to count parents here when branch is rejected for addition to strict?
+
                     build_or_strict_consensus(comp, full_label_set, new_trip, all_triplets, new_node, taxon_namespace, build, precomp=precomp, verbose=verbose, annotate=annotate)
 
                     if annotate:
@@ -1425,35 +1430,35 @@ def open_tree_viewer(viewer_command, treefile, tree_object=None):
 
 ########################################
 
-parser = ArgumentParser(description='Perform various analyses related to phylogenetic terraces. Invoke script without arguments to attempt to start Tk GUI.')
+parser = ArgumentParser(description='Perform various analyses related to phylogenetic terraces. Invoke script without arguments to start Tk GUI.')
 
 in_group = parser.add_argument_group('Input Files')
 
-in_group.add_argument('--alignment-file', default=None, help='nexus alignment including charsets (in a SETS block) to be used to determine character partition')
+in_group.add_argument('--alignment-file', default=None, help='nexus alignment including charsets to be used to determine character partition')
 
 in_group.add_argument('--parent-tree-file', default=None, help='single parent tree to be analyzed (nexus or newick)')
 
-in_group.add_argument('--treefiles-to-assign', nargs="*", default=None, help='trees to be assigned to one or more terraces by the --list-terraces function (nexus or newick)')
+in_group.add_argument('--treefiles-to-assign', nargs="*", default=None, help='trees to be assigned to one or more terraces (nexus or newick)')
 
 in_group.add_argument('--subset-file', default=None, help='file with lines indicating sets of taxa represented in various partition subsets (created by --coverage preprocessing option)')
 
-in_group.add_argument('--subtree-file', default=None, help='tree file containing the subtrees induced by the coverage subsets (created by the --display preprocessing option)')
+in_group.add_argument('--subtree-file', default=None, help='tree file containing the subtrees induced by the coverage subsets')
 
-in_group.add_argument('--triplet-file', default=None, help='tab or space delimited triplet file, with lines containing ingroup ingroup outgroup (Used as input for most analyses. created by --triplets preprocessing option)')
+in_group.add_argument('--triplet-file', default=None, help='tab or space delimited triplet file, with ingroup ingroup outgroup (created by --triplets preprocessing option)')
 
 preprocess = parser.add_argument_group('Preprosessing steps to perform on input files.  \nGeneral workflow would be --coverage, --display and --triplets, with each creating output consumed by following steps')
 
-preprocess.add_argument('-c', '--coverage', action='store_true', default=False, help='compute the taxon coverage matrix (AKA subsets file, requires --alignment-file)')
+preprocess.add_argument('-c', '--coverage', action='store_true', default=False, help='compute the taxon coverage matrix (aka subsets file, requires --alignment-file)')
 
-preprocess.add_argument('-d', '--display', action='store_true', default=False, help='print the subtrees displayed by the parent tree with the input subsets (requires --subset-file and --parent-tree-file)')
+preprocess.add_argument('-d', '--display', action='store_true', default=False, help='print the subtrees displayed by the input tree with the input subsets (requires --subset-file and --tree-files)')
 
-preprocess.add_argument('-t', '--triplets', action='store_true', default=False, help='Output arbitrary rooted taxon triples defining each edge in a set of trees. Used as input for most subsequent analyses (requires --subtree-file)')
+preprocess.add_argument('-t', '--triplets', action='store_true', default=False, help='Output arbitrary rooted taxon triples defining each edge in a set of treefiles (requires --tree-files)')
 
 analyses = parser.add_argument_group('Analyses to be performed on files created by preprocessing')
 
 #analyses.gui_options = {'start_hidden':True}
 
-analyses.add_argument('--count-parents', action='store_true', default=False, help='compute the number of parent trees compatible with a given set of triplets  (i.e., the terrace size. requires --triplet-file)')
+analyses.add_argument('--count-parents', action='store_true', default=False, help='compute the number of parent trees given a triplets file (requires --triplet-file)')
 
 #this isn't working yet
 #analyses.add_argument('--test-decisiveness', action='store_true', default=False, help='test whether supplied coverage matrix cannot result in terraces (i.e. is decisive) (requires --subset-file)')
@@ -1468,7 +1473,8 @@ analyses.add_argument('-s', '--strict', action='store_true', default=False, help
 
 analyses.add_argument('-l', '--list-terraces', action='store_true', default=False, help='take a set of trees and assign them to terraces (requires --subset-file and --treefiles-to-assign)')
 
-parser.add_argument('--simulate-coverage', type=float, nargs=3, default=None, help='simulate coverage matrices, using 3 values, #taxa #loci coverage proportion')
+#this needs work
+#parser.add_argument('--simulate-coverage', type=float, nargs=3, default=None, help='simulate coverage matrices, using 3 values, #taxa #loci coverage')
 
 analyses.add_argument('-a', '--annotate-clades', action='store_true', default=False, help='add node labels indicating the number of alternative resolutions within each clade when  creating a build or strict consensus tree')
 
@@ -1578,6 +1584,8 @@ if tk_root:
     #options.strict = True
     pass
 
+'''
+NEEDS WORK YET
 if options.simulate_coverage:
     taxa = int(options.simulate_coverage[0])
     loci = int(options.simulate_coverage[1])
@@ -1608,6 +1616,7 @@ if options.simulate_coverage:
     #prob = 1.0 - (taxa - 2.0) * (1.0 - cov**3)**loci
     #print 'Min prob decisive for tree: %f' % prob
     #stderr_writer.write('Min prob decisive for tree: %f\n' % prob)
+'''
 
 try:
 
