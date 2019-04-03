@@ -1450,9 +1450,25 @@ preprocess = parser.add_argument_group('Preprosessing steps to perform on input 
 
 preprocess.add_argument('-c', '--coverage', action='store_true', default=False, help='compute the taxon coverage matrix (aka subsets file, requires --alignment-file)')
 
-preprocess.add_argument('-d', '--display', action='store_true', default=False, help='print the subtrees displayed by the input tree with the input subsets (requires --subset-file and --tree-files)')
+preprocess.add_argument('-d', '--display', action='store_true', default=False, help='print the subtrees displayed by the input tree with the input subsets (requires --subset-file and --parent-tree-file)')
 
-preprocess.add_argument('-t', '--triplets', action='store_true', default=False, help='Output arbitrary rooted taxon triples defining each edge in a set of treefiles (requires --tree-files)')
+preprocess.add_argument('-t', '--triplets', action='store_true', default=False, help='Output arbitrary rooted taxon triples defining each edge in a set of treefiles (requires --subtree-file')
+
+#normal usage is 
+#alignment -> subsets
+#subsets & parent tree -> subtrees
+#subtrees -> triplets
+#triplets -> parents, consensuses, etc
+#subsets, trees_to_asign -> terrace assignment
+
+#with --auto,
+#look for auto.subsets for any function requring subsets, if not present, require --alignment file and create it
+#look for auto.subtrees, if not found, look for auto.subsets and create it
+
+#if --parents,--build, --strict, --generate-parents or --sample-parents
+#   look for auto.triplets, if not found look for auto.subtrees and create it
+
+preprocess.add_argument('--auto', action='store_true', default=False, help='automate the preprocessing steps as much as possible, using default filenames beginning in "auto."')
 
 analyses = parser.add_argument_group('Analyses to be performed on files created by preprocessing')
 
@@ -1557,20 +1573,57 @@ else:
 
     prof = cProfile.Profile() if options.profile else None
     #these pre-processing steps are done differently with the GUI
-    if options.coverage:
+    
+    subsets_needed = options.display or options.list_terraces 
+    subtrees_needed = options.triplets
+    triplets_needed = any([options.strict, options.build, options.count_parents, options.generate_parents, options.sample_parents])
+    
+    auto_subsets_fname = 'auto.subsets'
+    auto_subtrees_fname = 'auto.subtrees'
+    auto_triplets_fname= 'auto.triplets'
+    auto_subsets_found = os.path.isfile(auto_subsets_fname)
+    auto_subtrees_found = os.path.isfile(auto_subtrees_fname)
+    auto_triplets_found = os.path.isfile(auto_triplets_fname)
+
+    generate_triplets = options.triplets or ((options.auto and triplets_needed) and not auto_triplets_found)
+    subtrees_needed |= generate_triplets
+    generate_subtrees = options.display or ((options.auto and subtrees_needed) and not auto_subtrees_found)
+    subsets_needed |= generate_subtrees
+    generate_subsets = options.coverage or ((options.auto and subsets_needed) and not auto_subsets_found)
+
+    if generate_subsets:
         if not options.alignment_file:
-            sys.exit('alignment file (-a) must be supplied to determine taxon coverage')
-        profile_wrapper(print_subsets, prof, stdout_writer, options.alignment_file, messages=stderr_writer)
+            sys.exit('alignment file (-a or --alignment-file) must be supplied to determine taxon coverage (--coverage) or use the --auto setting')
+        
+        if options.auto:
+            #subset_out = file(auto_subset_fname, 'w')
+            with file(auto_subsets_fname, 'w') as subset_out:
+                profile_wrapper(print_subsets, prof, subset_out, options.alignment_file, messages=stderr_writer)
+            auto_subsets_found = os.path.isfile(auto_subsets_fname)
+        else:
+            profile_wrapper(print_subsets, prof, stdout_writer, options.alignment_file, messages=stderr_writer)
 
-    if options.display:
-        if not options.subset_file and options.parent_tree_file:
-            sys.exit('must specify both subset file (-s) and tree file (--parent-tree-file) to print displayed subtrees')
-        profile_wrapper(print_displayed_subtrees, prof, stdout_writer, options.parent_tree_file, options.subset_file, messages=stderr_writer)
+    if generate_subtrees:
+        if not options.parent_tree_file:
+            sys.exit('must specify parent tree file (--parent-tree-file) or use the --auto setting to print displayed subtrees (--display) or use the --auto setting')
+        if not options.subset_file and not options.auto:
+            sys.exit('must specify subset file (-s or --subset-file) or use the --auto setting to print displayed subtrees (--display)')
+       
+        if options.auto:
+            with file(auto_subtrees_fname, 'w') as subtree_out:
+                profile_wrapper(print_displayed_subtrees, prof, subtree_out, options.parent_tree_file, auto_subsets_fname, messages=stderr_writer)
+        else:
+            profile_wrapper(print_displayed_subtrees, prof, stdout_writer, options.parent_tree_file, options.subset_file, messages=stderr_writer)
 
-    if options.triplets:
-        if not options.subtree_file:
-            sys.exit('subtree file (--subtree-file) must be specified to calculate triplets')
-        profile_wrapper(calculate_triplets, prof, stdout_writer, options.subtree_file, stderr_writer)
+    if generate_triplets:
+        if not options.subtree_file and not options.auto:
+            sys.exit('must specify subtree file (--subtree-file) or use --auto setting to calculate triplets (--triplets)')
+
+        if options.auto:
+            with file(auto_triplets_fname, 'w') as triplets_out:
+                profile_wrapper(calculate_triplets, prof, triplets_out, auto_subtrees_fname, stderr_writer)
+        else:
+            profile_wrapper(calculate_triplets, prof, stdout_writer, options.subtree_file, stderr_writer)
 
 #for debugging, so gui doesn't actually need to be manipulated
 if tk_root:
@@ -1668,17 +1721,16 @@ try:
         '''
 
         if options.build:
-            if not options.triplet_file:
-                sys.exit('triplet file (-t) must be supplied to make BUILD tree')
-            
-            build_tree = profile_wrapper(make_build_tree, prof, stdout_writer, options.triplet_file, messages=stderr_writer, verbose=options.verbose, annotate=options.annotate_clades, nexus=options.nexus)
+            if not options.triplet_file and not options.auto:
+                sys.exit('triplet file (-t) must be supplied or --auto setting must be used to make BUILD tree')
+            build_tree = profile_wrapper(make_build_tree, prof, stdout_writer, (options.triplet_file or auto_triplets_fname), messages=stderr_writer, verbose=options.verbose, annotate=options.annotate_clades, nexus=options.nexus)
            
             if options.open_tree_viewer:
                 open_tree_viewer(tree_viewer_command, 'build.tre', build_tree)
             
         if options.strict:
-            if not options.triplet_file:
-                sys.exit('triplet file (-t) must be supplied to make strict consensus tree')
+            if not options.triplet_file and not options.auto: 
+                sys.exit('triplet file (-t) must be supplied or --auto setting must be used to make strict consensus tree')
             
             use_threads = False
             if use_threads and tk_gui:
@@ -1703,36 +1755,38 @@ try:
                 
                 #tk_gui.progress_bar.stop()
             else: 
-                strict_tree = profile_wrapper(make_strict_tree, prof, stdout_writer, options.triplet_file, messages=stderr_writer, verbose=options.verbose, annotate=options.annotate_clades, nexus=options.nexus)
+                strict_tree = profile_wrapper(make_strict_tree, prof, stdout_writer, (options.triplet_file or auto_triplets_fname), messages=stderr_writer, verbose=options.verbose, annotate=options.annotate_clades, nexus=options.nexus)
             
             if options.open_tree_viewer:
                 open_tree_viewer(tree_viewer_command, 'strict.tre', strict_tree)
             
         if options.count_parents:
-            if not options.triplet_file:
-                sys.exit('triplet file (-t) must be supplied to count parent trees')
-            profile_wrapper(count_trees_on_terrace, prof, stdout_writer, options.triplet_file, messages=stderr_writer)
+            if not options.triplet_file and not options.auto:
+                sys.exit('triplet file (-t) must be supplied or --auto setting must be used to count parent  trees')
+            profile_wrapper(count_trees_on_terrace, prof, stdout_writer, (options.triplet_file or auto_triplets_fname), messages=stderr_writer)
             if tk_root:
                 tk_root.mainloop()
 
         if options.generate_parents:
-            if not options.triplet_file:
-                sys.exit('triplet file (-t) must be supplied to generate parent trees')
-            profile_wrapper(generate_trees_on_terrace, prof, stdout_writer, options.triplet_file, messages=stderr_writer, nexus=options.nexus)
+            if not options.triplet_file and not options.auto :
+                sys.exit('triplet file (-t) must be supplied or --auto setting must be used to generate parent trees')
+            profile_wrapper(generate_trees_on_terrace, prof, stdout_writer, (options.triplet_file or auto_triplets_fname),  messages=stderr_writer, nexus=options.nexus)
             if tk_root:
                 tk_root.mainloop()
 
         if options.sample_parents:
-            if not options.triplet_file:
-                sys.exit('triplet file (-t) must be supplied to sample parent trees')
-            profile_wrapper(sample_trees_on_terrace, prof, options.sample_parents, stdout_writer, options.triplet_file, messages=stderr_writer, nexus=options.nexus)
+            if not options.triplet_file and not options.auto:
+                sys.exit('triplet file (-t) must be supplied or --auto setting must be used to sample parent trees')
+            profile_wrapper(sample_trees_on_terrace, prof, options.sample_parents, stdout_writer, (options.triplet_file or auto_triplets_fname), messages=stderr_writer, nexus=options.nexus)
             if tk_root:
                 tk_root.mainloop()
         
         if options.list_terraces:
-            if not options.subset_file or not options.treefiles_to_assign:
-                sys.exit('must specify both subset file (--subset-file) and --treefiles-to-assign to assign trees to terraces')
-            profile_wrapper(assign_to_terraces, prof, stdout_writer, options.treefiles_to_assign, options.subset_file, messages=stderr_writer)
+            if not options.treefiles_to_assign:
+                sys.exit('must specify --treefiles-to-assign to assign trees to terraces')
+            if not options.subset_file and not options.auto:
+                sys.exit('subsets file (-s) must be supplied or --auto setting must be used to assign trees to terraces')
+            profile_wrapper(assign_to_terraces, prof, stdout_writer, options.treefiles_to_assign, (options.subset_file or auto_subsets_fname), messages=stderr_writer)
             #profile_wrapper(assign_to_terraces_using_hashes, prof, stdout_writer, options.treefiles_to_assign, options.subset_file, messages=stderr_writer)
 
         if tk_root:
