@@ -61,11 +61,6 @@ PARENTS=$OUTDIR/allParents.tre
 #echo GENERATING ALL TREES ON TERRACE
 #$MAIN --generate-parents --triplet-file $TRIPLETS > $PARENTS || exit
 
-SAMP=100
-SAMPLES=$OUTDIR/samp"$SAMP".tre 
-echo SAMPLING $SAMP TREES FROM TERRACE
-$MAIN --sample-parents $SAMP --triplet-file $TRIPLETS > $SAMPLES || exit
-
 STRICT=$OUTDIR/strict.tre 
 #this function is impractical on many datasets and is commented out here
 #echo MAKING STRICT CONSENSUS OF TREES ON TERRACE

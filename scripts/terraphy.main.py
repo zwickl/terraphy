@@ -908,6 +908,7 @@ class RandomSelectionNode(object):
                 print 'r%s' % num
                 r.debug_print()
 
+#Lukasz Reszczynski pointed out that this sampling algorithm is not truly uniform
 def sample_trees_on_terrace(num, out, triplet_file, messages=sys.stderr, nexus=False):
     
     messages.write('Sampling %d  parent trees on terrace...\n' % num)
@@ -1481,7 +1482,8 @@ analyses.add_argument('--count-parents', action='store_true', default=False, hel
 
 analyses.add_argument('--generate-parents', action='store_true', default=False, help='generate compatible parent trees given a triplets file (requires --triplet-file)')
 
-analyses.add_argument('--sample-parents', default=0, type=int, help='sample indicated number of  parent trees given a triplets file (requires --triplet-file)')
+#SAMPLING REMOVAL
+#analyses.add_argument('--sample-parents', default=0, type=int, help='sample indicated number of  parent trees given a triplets file (requires --triplet-file)')
 
 analyses.add_argument('-b', '--build', action='store_true', default=False, help='compute the BUILD tree from a triplet file (requires --triplet-file)')
 
@@ -1576,7 +1578,9 @@ else:
     
     subsets_needed = options.display or options.list_terraces 
     subtrees_needed = options.triplets
-    triplets_needed = any([options.strict, options.build, options.count_parents, options.generate_parents, options.sample_parents])
+    #SAMPLING REMOAL`
+    #triplets_needed = any([options.strict, options.build, options.count_parents, options.generate_parents, options.sample_parents])
+    triplets_needed = any([options.strict, options.build, options.count_parents, options.generate_parents])
     
     auto_subsets_fname = 'auto.subsets'
     auto_subtrees_fname = 'auto.subtrees'
@@ -1774,13 +1778,17 @@ try:
             if tk_root:
                 tk_root.mainloop()
 
+        
+        #SAMPLING REMOVAL
+        '''
         if options.sample_parents:
             if not options.triplet_file and not options.auto:
                 sys.exit('triplet file (-t) must be supplied or --auto setting must be used to sample parent trees')
             profile_wrapper(sample_trees_on_terrace, prof, options.sample_parents, stdout_writer, (options.triplet_file or auto_triplets_fname), messages=stderr_writer, nexus=options.nexus)
             if tk_root:
                 tk_root.mainloop()
-        
+       '''
+
         if options.list_terraces:
             if not options.treefiles_to_assign:
                 sys.exit('must specify --treefiles-to-assign to assign trees to terraces')

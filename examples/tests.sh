@@ -28,7 +28,6 @@ TERRAPHYDIR=../scripts/
 MAIN=$TERRAPHYDIR/terraphy.main.py
 #MAIN=`which terraphy.main.py`
 
-
 SUBSETS=$OUTDIR/subsets
 SUBTREES=$OUTDIR/subtrees
 TRIPLETS=$OUTDIR/triplets
@@ -66,7 +65,6 @@ PARENTS=$OUTDIR/allParents.tre
 if [ ! -e $PARENTS ];then
     $MAIN --generate-parents --triplet-file $TRIPLETS > $PARENTS || exit
 fi 
-
 
 BUILD=$OUTDIR/build.tre 
 if [ ! -e $BUILD ];then
