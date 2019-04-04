@@ -51,6 +51,17 @@ try:
 except ImportError as e:
     sys.exit('%s\nproblem importing dendropy package - it is required' % e)
 
+class PrependWriter(object):
+    def __init__(self, stream, prepend):
+        self.prepend = prepend
+        self.stream = stream
+    def write(self, message):
+        self.stream.write('%s %s' % (self.prepend, message))
+
+#a class that effectively pipes output to /dev/null
+class SilentWriter(object):
+    def write(self, message):
+        pass
 
 #PYGRAPH PACKAGE
 '''
@@ -159,7 +170,7 @@ def calculate_triplets(out, intrees, messages=sys.stderr):
 def read_triplet_file(triplet_file, messages=sys.stderr):
     triplets = set()
     labels = []
-    messages.write('Reading triplets from file... ')
+    messages.write('Reading triplets from file...\n')
     with open(triplet_file, 'rb') as intrips:
         #first line is a list of all labels, all following lines are triples of taxa
         for line in intrips:
@@ -172,7 +183,7 @@ def read_triplet_file(triplet_file, messages=sys.stderr):
 #                if trip[1] < trip[0]:
 #                    trip[0], trip[1] = trip[1], trip[0]
                 triplets.add(tuple(trip))
-    messages.write('done.\n')
+    messages.write('done reading triplets.\n')
     return (labels, triplets)
 
 
@@ -1500,9 +1511,13 @@ parser.add_argument('--profile', action='store_true', default=False, help='profi
 
 parser.add_argument('--nexus', action='store_true', default=False, help='use nexus format for output trees')
 
-parser.add_argument('--open-tree-viewer', action='store_true', default=False, help='attempt to open an external tree viewer for build or strict consensus trees')
+#disabling this
+#parser.add_argument('--open-tree-viewer', action='store_true', default=False, help='attempt to open an external tree viewer for build or strict consensus trees')
 
 parser.add_argument('--verbose', action='store_true', default=False, help='spit out extra information for debugging purposes')
+
+parser.add_argument('--silent', action='store_true', default=False, help='do not output informational messages')
+
 
 stdout_writer = MultiWriter(sys.stdout.write)
 stderr_writer =  MultiWriter(sys.stderr.write)
@@ -1573,6 +1588,11 @@ else:
     tk_root = None
     options = parser.parse_args()
 
+    if options.silent:
+        my_stderr = SilentWriter()
+    else:
+        my_stderr = PrependWriter(sys.stderr, 'TERRAPHY INFO: ')
+
     prof = cProfile.Profile() if options.profile else None
     #these pre-processing steps are done differently with the GUI
     
@@ -1602,10 +1622,12 @@ else:
         if options.auto:
             #subset_out = file(auto_subset_fname, 'w')
             with file(auto_subsets_fname, 'w') as subset_out:
-                profile_wrapper(print_subsets, prof, subset_out, options.alignment_file, messages=stderr_writer)
+                #PREPEND
+                #profile_wrapper(print_subsets, prof, subset_out, options.alignment_file, messages=stderr_writer)
+                profile_wrapper(print_subsets, prof, subset_out, options.alignment_file, messages=my_stderr)
             auto_subsets_found = os.path.isfile(auto_subsets_fname)
         else:
-            profile_wrapper(print_subsets, prof, stdout_writer, options.alignment_file, messages=stderr_writer)
+            profile_wrapper(print_subsets, prof, stdout_writer, options.alignment_file, messages=my_stderr)
 
     if generate_subtrees:
         if not options.parent_tree_file:
@@ -1615,9 +1637,11 @@ else:
        
         if options.auto:
             with file(auto_subtrees_fname, 'w') as subtree_out:
-                profile_wrapper(print_displayed_subtrees, prof, subtree_out, options.parent_tree_file, auto_subsets_fname, messages=stderr_writer)
+                #profile_wrapper(print_displayed_subtrees, prof, subtree_out, options.parent_tree_file, auto_subsets_fname, messages=stderr_writer)
+                profile_wrapper(print_displayed_subtrees, prof, subtree_out, options.parent_tree_file, auto_subsets_fname, messages=my_stderr)
         else:
-            profile_wrapper(print_displayed_subtrees, prof, stdout_writer, options.parent_tree_file, options.subset_file, messages=stderr_writer)
+            #profile_wrapper(print_displayed_subtrees, prof, stdout_writer, options.parent_tree_file, options.subset_file, messages=stderr_writer)
+            profile_wrapper(print_displayed_subtrees, prof, stdout_writer, options.parent_tree_file, options.subset_file, messages=my_stderr)
 
     if generate_triplets:
         if not options.subtree_file and not options.auto:
@@ -1625,9 +1649,11 @@ else:
 
         if options.auto:
             with file(auto_triplets_fname, 'w') as triplets_out:
-                profile_wrapper(calculate_triplets, prof, triplets_out, auto_subtrees_fname, stderr_writer)
+                #profile_wrapper(calculate_triplets, prof, triplets_out, auto_subtrees_fname, stderr_writer)
+                profile_wrapper(calculate_triplets, prof, triplets_out, auto_subtrees_fname, my_stderr)
         else:
-            profile_wrapper(calculate_triplets, prof, stdout_writer, options.subtree_file, stderr_writer)
+            #profile_wrapper(calculate_triplets, prof, stdout_writer, options.subtree_file, stderr_writer)
+            profile_wrapper(calculate_triplets, prof, stdout_writer, options.subtree_file, my_stderr)
 
 #for debugging, so gui doesn't actually need to be manipulated
 if tk_root:
@@ -1706,9 +1732,13 @@ try:
             matrix_canvas.create_window((0, 0), window=button, height=button.winfo_reqheight(), width=button.winfo_reqwidth(), anchor='nw')
             
         else:
+            pass
+            #this graphic is pretty pointless, and appears anytime a subsets file is read
+            '''
             out_trans = ['-', 'X']
             for tax, cov in sorted(mat.per_taxon_presence_absence.items()):
                 sys.stderr.write('%30s\t%s\n' % (tax, ''.join([out_trans[c] for c in cov])))
+            '''
 
     while True:
         '''
@@ -1727,10 +1757,11 @@ try:
         if options.build:
             if not options.triplet_file and not options.auto:
                 sys.exit('triplet file (-t) must be supplied or --auto setting must be used to make BUILD tree')
-            build_tree = profile_wrapper(make_build_tree, prof, stdout_writer, (options.triplet_file or auto_triplets_fname), messages=stderr_writer, verbose=options.verbose, annotate=options.annotate_clades, nexus=options.nexus)
+            build_tree = profile_wrapper(make_build_tree, prof, stdout_writer, (options.triplet_file or auto_triplets_fname), messages=my_stderr, verbose=options.verbose, annotate=options.annotate_clades, nexus=options.nexus)
            
-            if options.open_tree_viewer:
-                open_tree_viewer(tree_viewer_command, 'build.tre', build_tree)
+            #disabling this
+            #if options.open_tree_viewer:
+            #    open_tree_viewer(tree_viewer_command, 'build.tre', build_tree)
             
         if options.strict:
             if not options.triplet_file and not options.auto: 
@@ -1759,7 +1790,8 @@ try:
                 
                 #tk_gui.progress_bar.stop()
             else: 
-                strict_tree = profile_wrapper(make_strict_tree, prof, stdout_writer, (options.triplet_file or auto_triplets_fname), messages=stderr_writer, verbose=options.verbose, annotate=options.annotate_clades, nexus=options.nexus)
+                #strict_tree = profile_wrapper(make_strict_tree, prof, stdout_writer, (options.triplet_file or auto_triplets_fname), messages=stderr_writer, verbose=options.verbose, annotate=options.annotate_clades, nexus=options.nexus)
+                strict_tree = profile_wrapper(make_strict_tree, prof, stdout_writer, (options.triplet_file or auto_triplets_fname), messages=my_stderr, verbose=options.verbose, annotate=options.annotate_clades, nexus=options.nexus)
             
             if options.open_tree_viewer:
                 open_tree_viewer(tree_viewer_command, 'strict.tre', strict_tree)
@@ -1767,14 +1799,16 @@ try:
         if options.count_parents:
             if not options.triplet_file and not options.auto:
                 sys.exit('triplet file (-t) must be supplied or --auto setting must be used to count parent  trees')
-            profile_wrapper(count_trees_on_terrace, prof, stdout_writer, (options.triplet_file or auto_triplets_fname), messages=stderr_writer)
+            #profile_wrapper(count_trees_on_terrace, prof, stdout_writer, (options.triplet_file or auto_triplets_fname), messages=stderr_writer)
+            profile_wrapper(count_trees_on_terrace, prof, stdout_writer, (options.triplet_file or auto_triplets_fname), messages=my_stderr)
             if tk_root:
                 tk_root.mainloop()
 
         if options.generate_parents:
             if not options.triplet_file and not options.auto :
                 sys.exit('triplet file (-t) must be supplied or --auto setting must be used to generate parent trees')
-            profile_wrapper(generate_trees_on_terrace, prof, stdout_writer, (options.triplet_file or auto_triplets_fname),  messages=stderr_writer, nexus=options.nexus)
+            #profile_wrapper(generate_trees_on_terrace, prof, stdout_writer, (options.triplet_file or auto_triplets_fname),  messages=stderr_writer, nexus=options.nexus)
+            profile_wrapper(generate_trees_on_terrace, prof, stdout_writer, (options.triplet_file or auto_triplets_fname),  messages=my_stderr, nexus=options.nexus)
             if tk_root:
                 tk_root.mainloop()
 
@@ -1794,7 +1828,8 @@ try:
                 sys.exit('must specify --treefiles-to-assign to assign trees to terraces')
             if not options.subset_file and not options.auto:
                 sys.exit('subsets file (-s) must be supplied or --auto setting must be used to assign trees to terraces')
-            profile_wrapper(assign_to_terraces, prof, stdout_writer, options.treefiles_to_assign, (options.subset_file or auto_subsets_fname), messages=stderr_writer)
+            #profile_wrapper(assign_to_terraces, prof, stdout_writer, options.treefiles_to_assign, (options.subset_file or auto_subsets_fname), messages=stderr_writer)
+            profile_wrapper(assign_to_terraces, prof, stdout_writer, options.treefiles_to_assign, (options.subset_file or auto_subsets_fname), messages=my_stderr)
             #profile_wrapper(assign_to_terraces_using_hashes, prof, stdout_writer, options.treefiles_to_assign, options.subset_file, messages=stderr_writer)
 
         if tk_root:
