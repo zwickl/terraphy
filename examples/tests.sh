@@ -81,5 +81,5 @@ fi
 
 
 echo TERRACES
-../scripts/terraphy.main.py --list-terraces --subset-file $SUBSETS --treefiles-to-assign $INPUTDIR/100pars.tre > $OUTDIR/terraceList
+$MAIN  --list-terraces --subset-file $SUBSETS --treefiles-to-assign $INPUTDIR/100pars.tre > $OUTDIR/terraceList
 

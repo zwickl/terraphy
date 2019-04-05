@@ -71,6 +71,6 @@ INPUTTREES=$INPUTDIR/100pars.tre
 echo ASSIGNING TREES TO TERRACES
 #This is a optional specialized functionality to test whether a set of input trees lies on a single or
 #multiple terraces
-../scripts/terraphy.main.py --list-terraces --subset-file $SUBSETS --treefiles-to-assign $INPUTTREES > $LIST
+$MAIN --list-terraces --subset-file $SUBSETS --treefiles-to-assign $INPUTTREES > $LIST
 
 
