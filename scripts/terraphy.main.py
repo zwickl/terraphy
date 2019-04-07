@@ -1442,7 +1442,8 @@ def open_tree_viewer(viewer_command, treefile, tree_object=None):
 
 ########################################
 
-parser = ArgumentParser(description='Perform various analyses related to phylogenetic terraces. Invoke script without arguments to start Tk GUI.')
+#parser = ArgumentParser(description='Perform various analyses related to phylogenetic terraces. Invoke script without arguments to start Tk GUI.')
+parser = ArgumentParser(description='Perform various analyses related to phylogenetic terraces.')
 
 in_group = parser.add_argument_group('Input Files')
 
@@ -1518,12 +1519,16 @@ parser.add_argument('--verbose', action='store_true', default=False, help='spit 
 
 parser.add_argument('--silent', action='store_true', default=False, help='do not output informational messages')
 
+#parser.add_argument('--start-gui', action='store_true', default=False, help='attempt to start the barebones Tk GUI')
+
 
 stdout_writer = MultiWriter(sys.stdout.write)
 stderr_writer =  MultiWriter(sys.stderr.write)
 
 #if no arguments are passed, try to start the tkinter gui
-if len(sys.argv) == 1:
+#disabling this until it can be improved
+#if len(sys.argv) == 1:
+if False:
     try:
         from Tkinter import *
         from tkarg.tkinterutils import *
