@@ -1798,8 +1798,8 @@ try:
                 #strict_tree = profile_wrapper(make_strict_tree, prof, stdout_writer, (options.triplet_file or auto_triplets_fname), messages=stderr_writer, verbose=options.verbose, annotate=options.annotate_clades, nexus=options.nexus)
                 strict_tree = profile_wrapper(make_strict_tree, prof, stdout_writer, (options.triplet_file or auto_triplets_fname), messages=my_stderr, verbose=options.verbose, annotate=options.annotate_clades, nexus=options.nexus)
             
-            if options.open_tree_viewer:
-                open_tree_viewer(tree_viewer_command, 'strict.tre', strict_tree)
+            #if options.open_tree_viewer:
+            #    open_tree_viewer(tree_viewer_command, 'strict.tre', strict_tree)
             
         if options.count_parents:
             if not options.triplet_file and not options.auto:
