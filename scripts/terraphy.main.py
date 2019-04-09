@@ -1319,18 +1319,23 @@ def assign_to_terraces(out, treefiles, subset_file, messages=sys.stderr):
         else:
             out_stream = out
 
+    #assign this same TaxonSet to all of the TreeLists created, otherwise bad things happen when trying to compare taxa and splits
+    global_taxon_set = trees[0].taxon_namespace
+    taxon_label_map = { taxon.label:taxon for taxon in global_taxon_set }
+    #allow interpretation of underscores as spaces in taxon names as well
+    #things can get complicated when input from various files differs in taxon labels
+    alt = {re.sub(' ', '_', lab):tax for lab, tax in taxon_label_map.items()}
+    taxon_label_map.update(alt)
+
     #the first tree has to be its own terrace
-    this_tree_subtrees = TreeList( [displayed_subtree(trees[0], subset) for subset in subsets] )
+    this_tree_subtrees = TreeList( [displayed_subtree(trees[0], [ taxon_label_map[label] for label in subset]) for subset in subsets], taxon_namespace=global_taxon_set )
     terrace_subtree_list = [this_tree_subtrees]
     terrace_size = {0:1}
     out_stream.write('tree 1 is on terrace 1\n')
     
-    #assign this same TaxonSet to all of the TreeLists created, otherwise bad things happen when trying to compare taxa and splits
-    global_taxon_set = this_tree_subtrees.taxon_namespace
-    
     #now start with the second tree
     for tree_num, tree in enumerate(trees[1:], 2):
-        this_tree_subtrees = TreeList( [displayed_subtree(tree, subset) for subset in subsets], taxon_namespace=global_taxon_set )
+        this_tree_subtrees = TreeList( [displayed_subtree(tree, [ taxon_label_map[label] for label in subset]) for subset in subsets], taxon_namespace=global_taxon_set )
         for terrace_num, terrace_subtrees in enumerate(terrace_subtree_list):
             terrace_match = True
             for sub1, sub2 in izip(terrace_subtrees, this_tree_subtrees):
@@ -1520,7 +1525,6 @@ parser.add_argument('--verbose', action='store_true', default=False, help='spit 
 parser.add_argument('--silent', action='store_true', default=False, help='do not output informational messages')
 
 #parser.add_argument('--start-gui', action='store_true', default=False, help='attempt to start the barebones Tk GUI')
-
 
 stdout_writer = MultiWriter(sys.stdout.write)
 stderr_writer =  MultiWriter(sys.stderr.write)
