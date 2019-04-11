@@ -72,14 +72,14 @@ if [ ! -e $BUILD ];then
     $MAIN --build --triplet-file $TRIPLETS > $BUILD || exit
 fi
 
-
 STRICT=$OUTDIR/strict.tre 
 if [ ! -e $STRICT ];then
     echo STRICT
     $MAIN --strict --triplet-file $TRIPLETS > $STRICT || exit
 fi
 
-
-echo TERRACES
-$MAIN  --list-terraces --subset-file $SUBSETS --treefiles-to-assign $INPUTDIR/100pars.tre > $OUTDIR/terraceList
+if [ $INPUTDIR = "Bouchenak" ];then
+    echo TERRACES
+    $MAIN  --list-terraces --subset-file $SUBSETS --treefiles-to-assign $INPUTDIR/100pars.tre > $OUTDIR/terraceList
+fi
 
