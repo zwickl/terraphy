@@ -13,10 +13,10 @@ try:
         from dendropy.utility.error import DataParseError
 
     #import dendropy.dataio.nexusreader.NotNexusFileError as NotNexusFileError
-    from dendropy.dataio.nexusreader  import NexusReader
-    from dendropy.dataio.tokenizer  import Tokenizer
-    #from  dendropy.dataio.nexusreader import NotNexusFileError
-    #from  dendropy.dataio.nexusreader import NexusReaderError
+    from dendropy.dataio.nexusreader import NexusReader
+    from dendropy.dataio.tokenizer import Tokenizer
+    #from dendropy.dataio.nexusreader import NotNexusFileError
+    #from dendropy.dataio.nexusreader import NexusReaderError
 
     #this deals with changes in DendroPy 4
     try:
@@ -111,14 +111,14 @@ def dendropy_read_treefile(treefiles, quiet=False, preserve_underscores=False, *
         except (DataParseError, NexusReader.NotNexusFileError) as e:
             sys.stderr.write('%s\n' % e.message)
             intrees.extend(TreeList.get_from_string(trees, "newick", case_sensitive_taxon_labels=True, preserve_underscores=preserve_underscores, **kwargs))
-        except (DataParseError, Tokenizer.UnexpectedEndOfStreamError, AttributeError)  as e:
+        except (DataParseError, Tokenizer.UnexpectedEndOfStreamError, AttributeError) as e:
             if not quiet:
                 sys.stderr.write('%s\n' % e.message)
-                sys.exit('Could not read file %s in nexus or newick  format ...\n' % tf)
+                sys.exit('Could not read file %s in nexus or newick format ...\n' % tf)
     else:
         for tf in treefiles:
             if not os.path.isfile(tf):
-                out_stream.write('TreeFile %s  does not exist' % tf)
+                out_stream.write('TreeFile %s does not exist' % tf)
                 sys.exit()
 
             #try two input formats
@@ -133,9 +133,9 @@ def dendropy_read_treefile(treefiles, quiet=False, preserve_underscores=False, *
                     if not quiet:
                         out_stream.write('Reading file %s in newick format ...\n' % tf)
                     intrees.extend(TreeList.get_from_path(tf, "newick", case_sensitive_taxon_labels=True, preserve_underscores=preserve_underscores, **kwargs))
-                except (DataParseError, Tokenizer.UnexpectedEndOfStreamError, AttributeError)  as e:
+                except (DataParseError, Tokenizer.UnexpectedEndOfStreamError, AttributeError) as e:
                     if not quiet:
                         sys.stderr.write('%s\n' % e.message)
-                        sys.exit('Could not read file %s in nexus or newick  format ...\n' % tf)
+                        sys.exit('Could not read file %s in nexus or newick format ...\n' % tf)
     return intrees
 

@@ -2,10 +2,13 @@
 import sys
 from random import sample, random
 
+#for py3 compatability:
+from __past__.builtins import xrange
+#most calls to range(x) replaced with list(range(x)), which works in py2 or 3 but is wasteful in 2
+
 #should funcs here that use tkinterutils be moved there?
 #something better needs to be done if this import fails
 #from tkarg.tkinterutils import *
-
 
 class CoverageMatrix(object):
     '''A class to hold information on the pattern of missing data in a matrix.
@@ -286,16 +289,16 @@ class CoverageMatrix(object):
         #AXIS LABELS
         ideal_x_labels, ideal_y_labels = 10, 10
         if num_x < ideal_x_labels:
-            x_labels = range(1, num_x+1)
+            x_labels = list(range(1, num_x+1))
         else:
-            x_labels = range(1, num_x+1, num_x / ideal_x_labels)
+            x_labels = list(range(1, num_x+1, num_x / ideal_x_labels))
         for lab in x_labels:
             canvas.create_text(x0 + x_box_size / 2 + x_box_size * (lab - 1), y_rect_offset - label_buffer, text=('%d' % lab), anchor='s') 
        
         if num_y < ideal_y_labels:
-            y_labels = range(1, num_y+1)
+            y_labels = list(range(1, num_y+1))
         else:
-            y_labels = range(1, num_y+1, num_y / ideal_y_labels)
+            y_labels = list(range(1, num_y+1, num_y / ideal_y_labels))
         for lab in y_labels:
             canvas.create_text((x_rect_offset - label_buffer, y0 + y_box_size / 2 + y_box_size * (lab - 1)), text='%d' % lab, anchor='e') 
 
@@ -354,9 +357,9 @@ class CoverageMatrix(object):
         
         ideal_y_labels = 5
         if max_y < ideal_y_labels:
-            y_labels = range(max_y+1)
+            y_labels = list(range(max_y+1))
         else:
-            y_labels = range(0, max_y+1, max_y / ideal_y_labels)
+            y_labels = list(range(0, max_y+1, max_y / ideal_y_labels))
         for lab in y_labels:
             canvas.create_text(x0 - plot_buffer, y0 - (lab * y_size_per_count), text=('%d' % lab), anchor='e') 
 
@@ -364,9 +367,9 @@ class CoverageMatrix(object):
 
         ideal_x_labels = 10
         if max_x < ideal_x_labels:
-            x_labels = range(max_x+1)
+            x_labels = list(range(max_x+1))
         else:
-            x_labels = range(0, max_x+1, max_x / ideal_x_labels)
+            x_labels = list(range(0, max_x+1, max_x / ideal_x_labels))
 
         x_loc = x0
         for num, count in enumerate(counts):

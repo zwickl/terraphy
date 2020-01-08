@@ -95,8 +95,8 @@ def find_triplets_defining_edges_descending_from_node(components):
 
                     #for in_subtree1, in_subtree2 in combinations(in_subtree, 2):
                     for in_subtree1, in_subtree2 in ingroup_pair(in_subtree):
-                        ingroup1 = sorted([ tax for tax in flattened_array_generator(in_subtree1, sys.maxint) ])[0]
-                        ingroup2 = sorted([ tax for tax in flattened_array_generator(in_subtree2, sys.maxint) ])[0]
+                        ingroup1 = sorted([ tax for tax in flattened_array_generator(in_subtree1, sys.maxsize) ])[0]
+                        ingroup2 = sorted([ tax for tax in flattened_array_generator(in_subtree2, sys.maxsize) ])[0]
                         #print in_subtree, in_subtree1, in_subtree2, ingroup1, ingroup2, out_subtree
                     
                         alpha_names = True
@@ -107,10 +107,10 @@ def find_triplets_defining_edges_descending_from_node(components):
                             #arbitrarily chosen taxa
 
 
-                            #ingroup1 = sorted([ tax for tax in flattened_array_generator(in_subtree[0], sys.maxint) ])[0]
-                            #ingroup2 = sorted([ tax for tax in flattened_array_generator(in_subtree[1], sys.maxint) ])[0]
+                            #ingroup1 = sorted([ tax for tax in flattened_array_generator(in_subtree[0], sys.maxsize) ])[0]
+                            #ingroup2 = sorted([ tax for tax in flattened_array_generator(in_subtree[1], sys.maxsize) ])[0]
                             
-                            outgroup = sorted([ tax for tax in flattened_array_generator(out_subtree, sys.maxint) ])[0]
+                            outgroup = sorted([ tax for tax in flattened_array_generator(out_subtree, sys.maxsize) ])[0]
                             trip = [ingroup1, ingroup2, outgroup]
                             #the ordering of the ingroup taxa is also arbitrary, so make it alphabetical
                             #can't do this with polytomies though
@@ -120,7 +120,7 @@ def find_triplets_defining_edges_descending_from_node(components):
                             #print trip
                         else:
                             for subtree in [in_subtree[0], in_subtree[1], out_subtree]:
-                                gen = flattened_array_generator(subtree, sys.maxint)
+                                gen = flattened_array_generator(subtree, sys.maxsize)
                                 trip.append(next(gen))
                         
 
