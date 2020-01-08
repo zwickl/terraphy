@@ -3,7 +3,8 @@ import sys
 from random import sample, random
 
 #for py3 compatability:
-from __past__.builtins import xrange
+if sys.version_info.major == 3:
+    from __past__.builtins import xrange
 #most calls to range(x) replaced with list(range(x)), which works in py2 or 3 but is wasteful in 2
 
 #should funcs here that use tkinterutils be moved there?
