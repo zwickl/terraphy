@@ -4,9 +4,9 @@
 #remove the leading # to uncomment one of the below TERRAPHY= as needed
 
 #this requires that Terraphy is globally installed
-TERRAPHY=terraphy.main.py
-#if you have a 64 bit mac this shgould work, and won't even require a python installation
-#TERRAPHY=../scripts/terraphy.main.standalone.OSX
+#TERRAPHY=terraphy.main.py
+#if you have a 64 bit mac this should work, and won't even require a python installation
+#TERRAPHY=../../scripts/terraphy.main.standalone.OSX
 
 #This script runs through the typical preprocessing steps 
 #and many of the analyses implemented by the software
