@@ -12,6 +12,10 @@ from random import sample, random, choice
 from collections import Iterable
 from copy import deepcopy
 
+#for py3 compatability:
+if sys.version_info.major == 3:
+    from __past__.builtins import xrange
+
 import cProfile, pstats, StringIO
 
 #if terraphy isn't installed globally, and this script is being run from the examples directory (i.e.. using a relaive path like  ../scripts/xxx.py)
