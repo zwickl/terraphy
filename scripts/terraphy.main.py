@@ -1,4 +1,8 @@
 #!/usr/bin/env python
+
+#for for Py2 to use py3 print syntax:
+from __future__ import print_function
+
 import sys
 import re
 import os
@@ -11,6 +15,8 @@ from itertools import izip, combinations
 from random import sample, random, choice
 from collections import Iterable
 from copy import deepcopy
+#for Py3 to use plain open(filename):
+from io import open
 
 #for py3 compatability:
 if sys.version_info.major == 3:
@@ -18,7 +24,7 @@ if sys.version_info.major == 3:
 
 import cProfile, pstats, StringIO
 
-#if terraphy isn't installed globally, and this script is being run from the examples directory (i.e.. using a relaive path like  ../scripts/xxx.py)
+#if terraphy isn't installed globally, and this script is being run from the examples directory (i.e.. using a relative path like  ../scripts/xxx.py)
 #make sure it can find the module components
 mod_base = os.path.split(os.path.dirname(os.path.abspath(inspect.stack()[0][1])))[0]
 sys.path = [ mod_base ] + sys.path
@@ -117,7 +123,7 @@ def profile_wrapper(func, profiler, *args, **kwargs):
     try:
         result = func(*args, **kwargs)
     except KeyboardInterrupt:
-        print 'terminating profiling'
+        print('terminating profiling')
         if profiler:
             profiler.disable()
         raise KeyboardInterrupt
@@ -203,15 +209,15 @@ def debug_output(label_set, triplets, components, level=0):
     '''Specialized debug output for strict consensus computation'''
     indent = ''.join('\t' for l in xrange(level))
     if len(label_set) > 10:
-        print indent, '%d labels, %d trips, %d comp' % (len(label_set or ''), len(triplets or ''), len(components or ''))
+        print(indent, '%d labels, %d trips, %d comp' % (len(label_set or ''), len(triplets or ''), len(components or '')))
     else:
         if label_set:
-            print indent, len(label_set), label_set
+            print(indent, len(label_set), label_set)
         if triplets:
-            print indent, len(triplets), triplets
+            print(indent, len(triplets), triplets)
         if components:
-            print indent, components
-    print indent, '----'
+            print(indent, components)
+    print(indent, '----')
 
 
 def make_build_tree(out, triplet_file, messages=sys.stderr, verbose=False, annotate=False, nexus=False):
@@ -297,33 +303,33 @@ def build_or_strict_consensus(label_set, full_label_set, triplets, all_triplets,
         #if there is only one component, some triplets are incompatible
         components = compute(label_set, triplets)
         if verbose:
-            print 'AFTER COMPUTE - build_or_strict'
+            print('AFTER COMPUTE - build_or_strict')
             debug_output(label_set, triplets, components)
         
         if len(components) > 1:
             for comp in components:
                 if not comp:
-                    print 'ZERO LENGTH COMPONENT'
+                    print('ZERO LENGTH COMPONENT')
                     sys.exit('ZERO LENGTH COMPONENT')
                 if len(comp) == 1:
                     #if only one label in component, add leaf
                     #can't index sets, so need to use pop
                     node.new_child(taxon=taxon_namespace.require_taxon(comp.pop())) 
                     if verbose:
-                        print '\tNEW SINGLETON'
+                        print('\tNEW SINGLETON')
                 elif len(comp) == 2:
                     #if two labels, add a cherry if the branch is in all trees, 
                     #otherwise add the two leaves to the current node
                     if verbose:
-                        print '\tTO is_edge_in_all_trees - build_or_strict = 2'
+                        print('\tTO is_edge_in_all_trees - build_or_strict = 2')
                         debug_output(comp, triplets, None, 1)
                     if build or is_edge_in_all_trees(comp, full_label_set, all_triplets, precomp=precomp, verbose=verbose):
                          if verbose:
-                            print '\tNEW CHERRY'
+                            print('\tNEW CHERRY')
                          new_node = node.new_child()
                     else:
                         if verbose:
-                            print '\tREJECTED', comp
+                            print('\tREJECTED', comp)
                         new_node = node
                     for el in comp:
                         new_node.new_child(taxon=taxon_namespace.require_taxon(label=el)) 
@@ -333,15 +339,15 @@ def build_or_strict_consensus(label_set, full_label_set, triplets, all_triplets,
                     #then if necessary add an internal node for that clade and recurse
                     new_trip = winnow_triplets(comp, triplets)
                     if verbose:
-                        print '\tTO is_edge_in_all_trees - build_or_strict > 2'
+                        print('\tTO is_edge_in_all_trees - build_or_strict > 2')
                         debug_output(comp, triplets, None, 1)
                     if build or is_edge_in_all_trees(comp, full_label_set, all_triplets, precomp=precomp, verbose=verbose):
                          if verbose:
-                            print '\tNEW CLADE'
+                            print('\tNEW CLADE')
                          new_node = node.new_child()
                     else:
                         if verbose:
-                            print '\tREJECTED', comp
+                            print('\tREJECTED', comp)
                         new_node = node
 
 
@@ -426,17 +432,17 @@ def is_edge_in_all_trees(in_components, label_set, triplets, precomp=None, verbo
             #conflicting triplets added below.  So, don't bother doing the recursive checks.
             if set([(x, in_comp, out_comp), (in_comp, x, out_comp)]) & triplets:
                 if verbose:
-                    print '\t\tConflicting triplet already in triplet set, skipping recursion'
+                    print('\t\tConflicting triplet already in triplet set, skipping recursion')
                 next
             else:
                 if verbose:
-                    print '\t\tMust recurse to check for conflict'
+                    print('\t\tMust recurse to check for conflict')
                 pass
             for conflict in [set([(x, out_comp, in_comp)]), set([(in_comp, out_comp, x)])]:
                 new_trip = triplets | conflict
                 if verbose:
-                    print '\t\tTO are_triplets_compatible - is_edge_in_all_trees'
-                    print '\t\tadded ', conflict
+                    print('\t\tTO are_triplets_compatible - is_edge_in_all_trees')
+                    print('\t\tadded ', conflict)
                     debug_output(label_set, new_trip, None, 2)
                 
                 #the new and old versions, with precomp of components at many nodes, or at only the root
@@ -463,11 +469,11 @@ def are_triplets_compatible(label_set, triplets, conflict, precomp=None, verbose
         precomp_test_triplet_compatibility(label_set, triplets, conflict, precomp, verbose=verbose)
     except IncompatibleTripletException:
         if verbose:
-            print 'INCOMPAT'
+            print('INCOMPAT')
         return False
 
     if verbose:
-        print '\t\t\tCOMPAT'
+        print('\t\t\tCOMPAT')
     return True
 
 
@@ -487,22 +493,22 @@ def test_triplet_compatibility(label_set, triplets, conflict, verbose=False, lev
 
         if verbose:
             indent = ''.join('\t' for l in xrange(level + 2))
-            print indent, 'AFTER COMPUTE - test_triplet_compatibility'
+            print(indent, 'AFTER COMPUTE - test_triplet_compatibility')
             debug_output(label_set, triplets, components, level+2)
 
         if len(components) > 1:
             for comp in components:
                 if not comp:
-                    print 'ZERO LENGTH COMPONENT'
+                    print('ZERO LENGTH COMPONENT')
                     sys.exit('ZERO LENGTH COMPONENT')
                 #these are the cases for a single tip or a cherry
                 if len(comp) == 1:
                     if verbose:
-                        print indent, 'COMP LEN 1 - PASS'
+                        print(indent, 'COMP LEN 1 - PASS')
                     pass
                 elif len(comp) == 2:
                     if verbose:
-                        print indent, 'COMP LEN 2 - PASS'
+                        print(indent, 'COMP LEN 2 - PASS')
                     pass
                 else:
                     #if > 2 labels in component, filter triplets to only include those in which both ingroups and outgroup 
@@ -516,14 +522,14 @@ def test_triplet_compatibility(label_set, triplets, conflict, verbose=False, lev
                     if winnow_triplets(comp, conflict):
                         new_trip = winnow_triplets(comp, triplets)
                         if verbose:
-                            print indent, 'COMP LEN %d - WINNOW AND RECURSE' % len(comp)
+                            print(indent, 'COMP LEN %d - WINNOW AND RECURSE' % len(comp))
                         test_triplet_compatibility(comp, new_trip, conflict, verbose=verbose, level=level+1)
                     else:
                         if verbose:
-                            print indent, 'COMP LEN %d - SKIP' % len(comp)
+                            print(indent, 'COMP LEN %d - SKIP' % len(comp))
         else:
             if verbose:
-                print ''.join('\t' for _ in  xrange(level+2)) ,
+                print(''.join('\t' for _ in  xrange(level+2)))
                 #print 'INCOMPAT AT LEVEL %d' % level
                 #print components
             raise IncompatibleTripletException('blah')
@@ -545,39 +551,39 @@ def precomp_test_triplet_compatibility(label_set, triplets, conflict, precomp=No
             if isinstance(precomp, list):
                 #This is the older way, where the only precomp was for the root
                 if verbose:
-                    print indent, 'Using list precomp'
+                    print(indent, 'Using list precomp')
                 components = compute(set((list(conflict)[0][:2])), conflict, precomp)
             else:
                 if frozenset(label_set) in precomp:
                     if verbose:
-                        print indent, 'Using comp_dict'
+                        print(indent, 'Using comp_dict')
                     components = compute(set((list(conflict)[0][:2])), conflict, precomp[frozenset(label_set)])
                 else:
                     if verbose:
-                        print indent, 'Not in comp_dict'
+                        print(indent, 'Not in comp_dict')
                     components = compute(label_set, triplets)
             
         else:
             components = compute(label_set, triplets)
         if verbose:
-            print indent, 'AFTER COMPUTE - precomp_test_triplet_compatibility'
+            print(indent, 'AFTER COMPUTE - precomp_test_triplet_compatibility')
             if precomp:
-                print indent, 'Used precomputed components'
+                print(indent, 'Used precomputed components')
             debug_output(label_set, triplets, components, level+2)
 
         if len(components) > 1:
             for comp in components:
                 if not comp:
-                    print 'ZERO LENGTH COMPONENT'
+                    print('ZERO LENGTH COMPONENT')
                     sys.exit('ZERO LENGTH COMPONENT')
                 #these are the cases for a single tip or a cherry
                 if len(comp) == 1:
                     if verbose:
-                        print indent, 'COMP LEN 1 - PASS'
+                        print(indent, 'COMP LEN 1 - PASS')
                     pass
                 elif len(comp) == 2:
                     if verbose:
-                        print indent, 'COMP LEN 2 - PASS'
+                        print(indent, 'COMP LEN 2 - PASS')
                     pass
                 else:
                     #if > 2 labels in component, filter triplets to only include those in which both ingroups and outgroup 
@@ -591,7 +597,7 @@ def precomp_test_triplet_compatibility(label_set, triplets, conflict, precomp=No
                     if winnow_triplets(comp, conflict):
                         new_trip = winnow_triplets(comp, triplets)
                         if verbose:
-                            print indent, 'COMP LEN %d - WINNOW AND RECURSE' % len(comp)
+                            print(indent, 'COMP LEN %d - WINNOW AND RECURSE' % len(comp))
                         
                         if isinstance(precomp, dict) and frozenset(comp) in precomp:
                             precomp_test_triplet_compatibility(comp, new_trip, conflict, precomp=precomp, verbose=verbose, level=level+1)
@@ -599,10 +605,10 @@ def precomp_test_triplet_compatibility(label_set, triplets, conflict, precomp=No
                             test_triplet_compatibility(comp, new_trip, conflict, verbose=verbose, level=level+1)
                     else:
                         if verbose:
-                            print indent, 'COMP LEN %d - SKIP' % len(comp)
+                            print(indent, 'COMP LEN %d - SKIP' % len(comp))
         else:
             if verbose:
-                print ''.join('\t' for _ in  xrange(level+2)) ,
+                print(''.join('\t' for _ in  xrange(level+2)))
             raise IncompatibleTripletException('blah')
 
 
@@ -620,13 +626,13 @@ def compute_comp_dict(label_set, triplets, comp_dict, verbose=False, level=1):
         comp_dict[frozenset(label_set)] = components
         if verbose:
             indent = ''.join('\t' for l in xrange(level))
-            print indent, 'AFTER COMPUTE - compute_comp_dict'
+            print(indent, 'AFTER COMPUTE - compute_comp_dict')
             debug_output(label_set, triplets, components, level+2)
 
         if len(components) > 1:
             for comp in components:
                 if not comp:
-                    print 'ZERO LENGTH COMPONENT'
+                    print('ZERO LENGTH COMPONENT')
                     sys.exit('ZERO LENGTH COMPONENT')
                 #these are the cases for a single tip or a cherry
                 if len(comp) == 1:
@@ -640,7 +646,7 @@ def compute_comp_dict(label_set, triplets, comp_dict, verbose=False, level=1):
                     compute_comp_dict(comp, new_trip, comp_dict, verbose=verbose, level=level+1)
         else:
             if verbose:
-                print '%d' % level ,
+                print('%d\t' % level)
             raise IncompatibleTripletException('blah')
 
 
@@ -774,12 +780,12 @@ def generate_all_subtrees_for_label_set(label_set, tns):
     #one descendent - that is good, as it allows attaching a new leaf to that root edge
     last_level = TreeList.get_from_string(treestr, "newick", rooting='force-rooted')
 
-    #print 'generating subtrees for',  label_set
+    #print('generating subtrees for',  label_set)
 
     for leaf in label_set[2:]:
         this_level = TreeList(taxon_namespace=tns)
         for last in last_level:
-            #print '%s' % last
+            #print('%s' % last)
             last.encode_bipartitions()
             
             for bip, edge in last.bipartition_edge_map.items():
@@ -793,7 +799,7 @@ def generate_all_subtrees_for_label_set(label_set, tns):
                     new_node = parent.new_child()
                     new_node.add_child(child)
                     new_node.new_child(taxon=tns.require_taxon(label=leaf))
-                    #print '%s' % new_tree
+                    #print('%s' % new_tree)
 
                 else:
                     child = new_tree.seed_node
@@ -801,7 +807,7 @@ def generate_all_subtrees_for_label_set(label_set, tns):
                     parent.add_child(child)
                     new_tree.seed_node = parent
                     parent.new_child(taxon=tns.require_taxon(label=leaf))
-                    #print '%s root' % new_tree
+                    #print('%s root' % new_tree)
 
                 n = new_tree.node_factory()
                 n.add_child(new_tree.seed_node)
@@ -821,7 +827,7 @@ def generate_all_subtrees_for_label_set(label_set, tns):
         n = new_tree.node_factory()
         n.add_child(t.seed_node)
         t.seed_node = n
-        #print '%s' % t
+        #print('%s' % t)
 
     return last_level
 
@@ -907,20 +913,20 @@ class RandomSelectionNode(object):
 
             #return a treelist here, or select a tree?
             comb = combine_subtrees(left_subtree, right_subtree)
-            #print 'comb', type(comb)
+            #print('comb', type(comb))
             return comb
 
     def debug_print(self):
-        print 'debprint'
+        print('debprint')
         if self.subtrees:
-            print 'self.subtrees'
+            print('self.subtrees')
             self.subtrees.write_to_stream(dest=sys.stdout, schema='newick', suppress_edge_lengths=True, suppress_internal_node_labels=True, suppress_internal_taxon_labels=True, suppress_annotations=True, unquoted_underscores=True)
         else:
-            print '%d pairs' % len(self.left_right_pairs)
+            print('%d pairs' % len(self.left_right_pairs))
             for num, (r, l) in enumerate(self.left_right_pairs):
-                print 'l%s' %num
+                print('l%s' %num)
                 l.debug_print()
-                print 'r%s' % num
+                print('r%s' % num)
                 r.debug_print()
 
 #Lukasz Reszczynski pointed out that this sampling algorithm is not truly uniform
@@ -1233,7 +1239,7 @@ def print_subsets(out, infile, messages=sys.stderr):
             else:
                 presence_absence[taxon].append(False)
 
-    for locus in range(len(char_subsets)):
+    for locus in list(range(len(char_subsets))):
         #print '\t'.join([re.sub(' ', '_', tax.label) for tax in presence_absence.iterkeys() if presence_absence[tax][locus]])
         out_stream.write('%s\n' % '\t'.join([re.sub(' ', '_', tax.label) for tax in presence_absence.iterkeys() if presence_absence[tax][locus]]))
     
@@ -1551,7 +1557,7 @@ if False:
     try:
      tk_root = Tk()
     except TclError as e:
-        print e
+        print(e)
         stderr_writer.write('\nUnable to start Tkinter GUI.  Use command line options.\n\n'.upper())
         sys.exit()
     tk_gui = ArgparseGui(parser, tk_root, width=1200, height=720, destroy_when_done=False, progress_bar=False)
@@ -1853,7 +1859,7 @@ try:
             break
 
 except KeyboardInterrupt:
-    print 'terminating profiling and attemping to output results '
+    print('terminating profiling and attemping to output results ')
 finally:
     if prof:
         output_profile(prof)
