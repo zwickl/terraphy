@@ -11,16 +11,20 @@ import subprocess
 import shlex
 import threading
 from argparse import ArgumentParser
-from itertools import izip, combinations
+from itertools import combinations
 from random import sample, random, choice
 from collections import Iterable
 from copy import deepcopy
+
 #for Py3 to use plain open(filename):
 from io import open
 
 #for py3 compatability:
 if sys.version_info.major == 3:
     from __past__.builtins import xrange
+#for Py2 to use Py3 zip syntax, functionally identical
+if sys.version_info.major == 2:
+    import itertools.izip as zip
 
 import cProfile, pstats, StringIO
 
@@ -1348,7 +1352,7 @@ def assign_to_terraces(out, treefiles, subset_file, messages=sys.stderr):
         this_tree_subtrees = TreeList( [displayed_subtree(tree, [ taxon_label_map[label] for label in subset]) for subset in subsets], taxon_namespace=global_taxon_set )
         for terrace_num, terrace_subtrees in enumerate(terrace_subtree_list):
             terrace_match = True
-            for sub1, sub2 in izip(terrace_subtrees, this_tree_subtrees):
+            for sub1, sub2 in zip(terrace_subtrees, this_tree_subtrees):
                 #if any subtree doesn't match, break to next terrace
                 if not same_tree(sub1, sub2):
                     terrace_match = False
