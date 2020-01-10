@@ -23,7 +23,7 @@ from setuptools import setup, find_packages
 sys.stderr.write("searching for packages\n")
 PACKAGES = find_packages()
 EXTRA_KWARGS = dict(
-    install_requires = ['dendropy', ], 
+    install_requires = ['dendropy', 'six'], 
     include_package_data=True,
     zip_safe=True
     )

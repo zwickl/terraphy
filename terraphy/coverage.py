@@ -1,11 +1,13 @@
 #!/usr/bin/env python
+
+#for for Py2 to use py3 print syntax:
+from __future__ import print_function
+
 import sys
 from random import sample, random
 
-#for py3 compatability:
-if sys.version_info.major == 3:
-    from __past__.builtins import xrange
-#most calls to range(x) replaced with list(range(x)), which works in py2 or 3 but is wasteful in 2
+#for Py2/3 compat
+from six.moves import range
 
 #should funcs here that use tkinterutils be moved there?
 #something better needs to be done if this import fails
@@ -38,12 +40,12 @@ class CoverageMatrix(object):
         '''Simulate a taxon coverage matrix by making the locus taxon sets
         '''
 
-        taxa = [ 't%d' % t for t in xrange(num_taxa) ]
+        taxa = [ 't%d' % t for t in range(num_taxa) ]
         self.taxa = set(taxa)
-        subsets = [ [] for _ in xrange(num_loci) ]
+        subsets = [ [] for _ in range(num_loci) ]
 
-        for x in xrange(num_loci):
-            for y in xrange(num_taxa):
+        for x in range(num_loci):
+            for y in range(num_taxa):
                 #print func(x, y, coverage),
                 if (reference_taxon and y == 0) or (random() < func(x, y, coverage)):
                     subsets[x].append(taxa[y])
@@ -52,15 +54,15 @@ class CoverageMatrix(object):
     def fill_random_locus_func(self, num_taxa, num_loci, func, min_coverage=0.0, max_coverage=1.0, reference_taxon=False):
         '''Simulate a taxon coverage matrix by making the locus taxon sets
         '''
-        taxa = [ 't%d' % t for t in xrange(num_taxa) ]
+        taxa = [ 't%d' % t for t in range(num_taxa) ]
         self.taxa = set(taxa)
-        subsets = [ [] for _ in xrange(num_loci) ]
+        subsets = [ [] for _ in range(num_loci) ]
 
-        for x in xrange(num_loci):
+        for x in range(num_loci):
             coverage = -1.0
             while coverage < min_coverage or coverage > max_coverage:
                 coverage = func()
-            for y in xrange(num_taxa):
+            for y in range(num_taxa):
                 #print func(x, y, coverage),
                 if (reference_taxon and y == 0) or (random() < coverage):
                     subsets[x].append(taxa[y])
@@ -69,9 +71,9 @@ class CoverageMatrix(object):
     def fill_random_taxon_func(self, num_taxa, num_loci, func, min_coverage=0.0, max_coverage=1.0, reference_taxon=False):
         '''Simulate a taxon coverage matrix by making the locus taxon sets
         '''
-        taxa = [ 't%d' % t for t in xrange(num_taxa) ]
+        taxa = [ 't%d' % t for t in range(num_taxa) ]
         self.taxa = set(taxa)
-        subsets = [ [] for _ in xrange(num_loci) ]
+        subsets = [ [] for _ in range(num_loci) ]
         
         cov_list = []
         for _ in taxa:
@@ -79,10 +81,10 @@ class CoverageMatrix(object):
                 coverage = func()
             cov_list.append(coverage)
        
-        print cov_list, sum(cov_list) / float(num_taxa)
+        print(cov_list, sum(cov_list) / float(num_taxa))
 
-        for x in xrange(num_loci):
-            for y in xrange(num_taxa):
+        for x in range(num_loci):
+            for y in range(num_taxa):
                 if (reference_taxon and y == 0) or (random() < cov_list[y]):
                     subsets[x].append(taxa[y])
         self.fill_from_subsets(subsets)
@@ -109,7 +111,7 @@ class CoverageMatrix(object):
             sys.exit('columns already filled')
         elif not self.per_taxon_presence_absence:
             sys.stderr.write('WARNING: filling matrix columns from empty matrix rows')
-        for sub_num in xrange(len(self.per_taxon_presence_absence[0])):
+        for sub_num in range(len(self.per_taxon_presence_absence[0])):
             self.per_locus_taxon_sets.append([tax[sub_num] for tax in self.per_taxon_presence_absence])
 
     def fill_taxa(self, recalculate=False):
@@ -139,7 +141,7 @@ class CoverageMatrix(object):
 
     def print_subset_vectors(self):
         for c in self.per_locus_taxon_sets:
-            print ' '.join(c)
+            print(' '.join(c))
 
     def loci_per_taxon(self):
         if not self.per_taxon_presence_absence:
@@ -176,9 +178,9 @@ class CoverageMatrix(object):
         tlist = list(self.taxa)
 
         if not self.find_reference_taxon():
-            print 'NO reference taxon present (decisiveness test may not be accurate)' 
+            print('NO reference taxon present (decisiveness test may not be accurate)')
         else:
-            print 'Reference taxon present' 
+            print('Reference taxon present')
         
         num_tests = 0
         found = 0
@@ -364,7 +366,7 @@ class CoverageMatrix(object):
         for lab in y_labels:
             canvas.create_text(x0 - plot_buffer, y0 - (lab * y_size_per_count), text=('%d' % lab), anchor='e') 
 
-        print x0 - plot_buffer, y0 - (lab * y_size_per_count)
+        print(x0 - plot_buffer, y0 - (lab * y_size_per_count))
 
         ideal_x_labels = 10
         if max_x < ideal_x_labels:

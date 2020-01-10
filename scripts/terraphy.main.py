@@ -13,20 +13,17 @@ import threading
 from argparse import ArgumentParser
 from itertools import combinations
 from random import sample, random, choice
-from collections import Iterable
+#from collections import Iterable
 from copy import deepcopy
 
 #for Py3 to use plain open(filename):
 from io import open
 
 #for py3 compatability:
-if sys.version_info.major == 3:
-    from __past__.builtins import xrange
-#for Py2 to use Py3 zip syntax, functionally identical
-if sys.version_info.major == 2:
-    import itertools.izip as zip
+from six import itervalues, iterkeys, StringIO
+from six.moves import zip, range
 
-import cProfile, pstats, StringIO
+import cProfile, pstats 
 
 #if terraphy isn't installed globally, and this script is being run from the examples directory (i.e.. using a relative path like  ../scripts/xxx.py)
 #make sure it can find the module components
@@ -135,7 +132,7 @@ def profile_wrapper(func, profiler, *args, **kwargs):
 
 
 def output_profile(prof):
-    s = StringIO.StringIO()
+    s = StringIO()
     sortby = 'cumulative'
     ps = pstats.Stats(prof, stream=s).sort_stats(sortby)
     ps.print_stats()
@@ -185,7 +182,7 @@ def read_triplet_file(triplet_file, messages=sys.stderr):
     triplets = set()
     labels = []
     messages.write('Reading triplets from file...\n')
-    with open(triplet_file, 'rb') as intrips:
+    with open(triplet_file, 'r') as intrips:
         #first line is a list of all labels, all following lines are triples of taxa
         for line in intrips:
             if not labels:
@@ -211,7 +208,7 @@ class IncompatibleTripletException(Exception):
 
 def debug_output(label_set, triplets, components, level=0):
     '''Specialized debug output for strict consensus computation'''
-    indent = ''.join('\t' for l in xrange(level))
+    indent = ''.join('\t' for l in range(level))
     if len(label_set) > 10:
         print(indent, '%d labels, %d trips, %d comp' % (len(label_set or ''), len(triplets or ''), len(components or '')))
     else:
@@ -496,7 +493,7 @@ def test_triplet_compatibility(label_set, triplets, conflict, verbose=False, lev
         components = compute(label_set, triplets)
 
         if verbose:
-            indent = ''.join('\t' for l in xrange(level + 2))
+            indent = ''.join('\t' for l in range(level + 2))
             print(indent, 'AFTER COMPUTE - test_triplet_compatibility')
             debug_output(label_set, triplets, components, level+2)
 
@@ -533,7 +530,7 @@ def test_triplet_compatibility(label_set, triplets, conflict, verbose=False, lev
                             print(indent, 'COMP LEN %d - SKIP' % len(comp))
         else:
             if verbose:
-                print(''.join('\t' for _ in  xrange(level+2)))
+                print(''.join('\t' for _ in  range(level+2)))
                 #print 'INCOMPAT AT LEVEL %d' % level
                 #print components
             raise IncompatibleTripletException('blah')
@@ -547,7 +544,7 @@ def precomp_test_triplet_compatibility(label_set, triplets, conflict, precomp=No
         #No triplets, so no internal branches within clade.
         return
     else:
-        indent = ''.join('\t' for l in xrange(level + 2))
+        indent = ''.join('\t' for l in range(level + 2))
         #This returns one component for each of the clades descending from this node
         #The members of the component indicate the labels in each clade
         #if there is only one component, some triplets are incompatible
@@ -612,7 +609,7 @@ def precomp_test_triplet_compatibility(label_set, triplets, conflict, precomp=No
                             print(indent, 'COMP LEN %d - SKIP' % len(comp))
         else:
             if verbose:
-                print(''.join('\t' for _ in  xrange(level+2)))
+                print(''.join('\t' for _ in  range(level+2)))
             raise IncompatibleTripletException('blah')
 
 
@@ -629,7 +626,7 @@ def compute_comp_dict(label_set, triplets, comp_dict, verbose=False, level=1):
         components = compute(label_set, triplets)
         comp_dict[frozenset(label_set)] = components
         if verbose:
-            indent = ''.join('\t' for l in xrange(level))
+            indent = ''.join('\t' for l in range(level))
             print(indent, 'AFTER COMPUTE - compute_comp_dict')
             debug_output(label_set, triplets, components, level+2)
 
@@ -685,7 +682,7 @@ def superb_count_parents(label_set, triplets):
         
         if num_components > 1:
             num_biparts = 2 ** (num_components - 1) - 1
-            for i in xrange(1, num_biparts + 1):
+            for i in range(1, num_biparts + 1):
                 subset1, subset2 = create_bipartition(components, i)
                 if len(subset1) <= 2:
                     q = 1
@@ -756,7 +753,7 @@ def generate_trees_on_terrace(out, triplet_file, messages=sys.stderr, nexus=Fals
         p.seed_node = p.seed_node.child_nodes()[0]
 
     if isinstance(out, str):
-        out_stream = open(out, 'wb') 
+        out_stream = open(out, 'w') 
     else:
         out_stream = out
 
@@ -855,7 +852,7 @@ def superb_generate_parents(label_set, triplets, tns):
         
         if num_components > 1:
             num_biparts = 2 ** (num_components - 1) - 1
-            for i in xrange(1, num_biparts + 1):
+            for i in range(1, num_biparts + 1):
 
                 subtree_lists = []
                 for subs in create_bipartition(components, i, as_list=True):
@@ -947,7 +944,7 @@ def sample_trees_on_terrace(num, out, triplet_file, messages=sys.stderr, nexus=F
     root = superb_generate_master_sampling_tree(label_set, triplets, tns)
 
     parents = TreeList(taxon_namespace=tns)
-    for _ in xrange(num):
+    for _ in range(num):
 
         p = root.choose()
         #parents.extend(p)
@@ -965,7 +962,7 @@ def sample_trees_on_terrace(num, out, triplet_file, messages=sys.stderr, nexus=F
         p.seed_node = p.seed_node.child_nodes()[0]
 
     if isinstance(out, str):
-        out_stream = open(out, 'wb') 
+        out_stream = open(out, 'w') 
     else:
         out_stream = out
 
@@ -1014,7 +1011,7 @@ def superb_generate_master_sampling_tree(label_set, triplets, tns):
         if num_components > 1:
 
             num_biparts = 2 ** (num_components - 1) - 1
-            for i in xrange(1, num_biparts + 1):
+            for i in range(1, num_biparts + 1):
             #each pass through this loop generates a pair consisting of (non-independednt) left/right subtree options
 
                 sides = []
@@ -1061,8 +1058,8 @@ def create_bipartition(components, nth, as_list=False):
     #leading zeros are trimmed, so add them if necessary to make the string the right length
     if len(pattern) < num_components:
         pattern = '0' * (num_components - len(pattern)) + bin(nth)[2:]
-    subsets = (set( e for e in flattened_array_generator([components[el] for el in xrange(num_components) if pattern[el] == "0"])),
-            set(e for e in flattened_array_generator([components[el] for el in xrange(num_components) if pattern[el] == "1"])))
+    subsets = (set( e for e in flattened_array_generator([components[el] for el in range(num_components) if pattern[el] == "0"])),
+            set(e for e in flattened_array_generator([components[el] for el in range(num_components) if pattern[el] == "1"])))
     if as_list:
         subsets = (list(subsets[0]), list(subsets[1]))
     return subsets
@@ -1131,7 +1128,7 @@ def my_connected_components(connections, precomp=None):
     
     if False:
         #this ends up being slower than the old version below, as do other tweaks I tried
-        for star in connections.itervalues():
+        for star in itervalues(connections):
             if star & assigned:
                 to_remove = []
                 for comp in components:
@@ -1145,7 +1142,7 @@ def my_connected_components(connections, precomp=None):
                 components.append(star)
             assigned |= star
     else:
-        for star in connections.itervalues():
+        for star in itervalues(connections):
             #If any member of this partial component has already been put into a component (possibly
             #overlapping with multiple components) we'll need to collect anything that overlaps and
             #then remove the parts that were joined from the component list.  I don't see a faster 
@@ -1198,7 +1195,7 @@ def pygraph_connected_components(connections):
     #comp = {num:[] for num in xrange(1, max(connect_dict.values()) + 1)}
     #for node, compnum in connect_dict.iteritems():
     #    comp[compnum].append(node)
-    comp = {num:set() for num in xrange(1, max(connect_dict.values()) + 1)}
+    comp = {num:set() for num in range(1, max(connect_dict.values()) + 1)}
     for node, compnum in connect_dict.iteritems():
         comp[compnum].add(node)
 
@@ -1245,7 +1242,7 @@ def print_subsets(out, infile, messages=sys.stderr):
 
     for locus in list(range(len(char_subsets))):
         #print '\t'.join([re.sub(' ', '_', tax.label) for tax in presence_absence.iterkeys() if presence_absence[tax][locus]])
-        out_stream.write('%s\n' % '\t'.join([re.sub(' ', '_', tax.label) for tax in presence_absence.iterkeys() if presence_absence[tax][locus]]))
+        out_stream.write('%s\n' % '\t'.join([re.sub(' ', '_', tax.label) for tax in iterkeys(presence_absence) if presence_absence[tax][locus]]))
     
     if isinstance(out, str):
         out_stream.close()
@@ -1255,7 +1252,7 @@ def print_subsets(out, infile, messages=sys.stderr):
 
 def read_subset_file(subset_file):
     subsets = []
-    with open(subset_file, 'rb') as subs:
+    with open(subset_file, 'r') as subs:
         for line in subs:
             sub = line.strip().split()
             #ignore blank lines
@@ -1436,7 +1433,7 @@ def num_trees(taxa):
         trees = 1
     else:
         trees = 1
-        for i in xrange(3, taxa + 1):
+        for i in range(3, taxa + 1):
             trees *= ((2 * i) - 3)
     return trees
 
@@ -1697,7 +1694,7 @@ if options.simulate_coverage:
     loci = int(options.simulate_coverage[1])
     cov = options.simulate_coverage[2]
 
-    sim_tree = uniform_pure_birth(TaxonNamespace(['t%d' % num for num in xrange(taxa)]))
+    sim_tree = uniform_pure_birth(TaxonNamespace(['t%d' % num for num in range(taxa)]))
     sim_tree.write_to_path('parent.tre', schema='nexus')
 
     mat = CoverageMatrix()
